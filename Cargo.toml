@@ -1,0 +1,17 @@
+[package]
+name = "bazar"
+version = "0.1.0"
+authors = ["Naaman <naaman.the.dev@gmail.com>"]
+edition = "2018"
+
+[lib]
+path = "src/lib.rs"
+
+[[bin]]
+path = "src/main.rs"
+name = "app"
+
+[dependencies]
+actix-web = "3.3.0"
+actix-rt = "1.1.1"
+reqwest = "0.10.9"
