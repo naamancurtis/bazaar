@@ -6,6 +6,7 @@ use std::net::TcpListener;
 use crate::{routes::*, MutationRoot, QueryRoot};
 
 pub fn build_app(listener: TcpListener, connection: PgPool) -> Result<Server, std::io::Error> {
+    dbg!(&listener, &connection);
     let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription)
         .data(connection.clone())
         .finish();

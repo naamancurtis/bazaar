@@ -22,6 +22,7 @@ serde_json = "1.0.59"
 sqlx = { version = "0.4.1", default-features = false, features = ["runtime-tokio-native-tls", "macros", "postgres", "uuid", "chrono", "migrate"] }
 uuid = { version = "0.8.1", features = ["serde", "v4"] }
 chrono = { version = "0.4.19", features = ["serde"] }
+tokio = { version = "0.2.6", features = ["full"] }
 
 dotenv = "0.15.0"
 anyhow = "1.0.34"
@@ -31,7 +32,7 @@ tracing-subscriber = "0.2.15"
 tracing-futures = "0.2.4"
 tracing-log = "0.1.1"
 tracing-bunyan-formatter = "0.1.7"
-config = "0.10.1"
+config = { version = "0.10.1", default-features = false, features = ["yaml"] }
 
 [dev-dependencies]
-reqwest = "0.10.9"
+reqwest = { version = "0.10.9", features = ["json"] } 
