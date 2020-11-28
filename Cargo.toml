@@ -19,7 +19,7 @@ async-graphql-actix-web = "2.1.5"
 serde = { version = "1.0.117", features = ["derive"] }
 serde_json = "1.0.59"
 
-sqlx = { version = "0.4.1", default-features = false, features = ["runtime-actix-native-tls", "macros", "postgres", "uuid", "chrono"] }
+sqlx = { version = "0.4.1", default-features = false, features = ["runtime-tokio-native-tls", "macros", "postgres", "uuid", "chrono", "migrate"] }
 uuid = { version = "0.8.1", features = ["serde", "v4"] }
 chrono = { version = "0.4.19", features = ["serde"] }
 
@@ -31,6 +31,7 @@ tracing-subscriber = "0.2.15"
 tracing-futures = "0.2.4"
 tracing-log = "0.1.1"
 tracing-bunyan-formatter = "0.1.7"
+config = "0.10.1"
 
 [dev-dependencies]
 reqwest = "0.10.9"

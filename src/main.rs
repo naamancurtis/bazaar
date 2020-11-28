@@ -1,9 +1,10 @@
-use bazar::build_app;
+use bazar::{build_app, get_configuration};
 use std::net::TcpListener;
 
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
-    let listener = TcpListener::bind("127.0.0.1:8000").expect("failed to bind random port");
-
+    let configuration = get_configuration().expect("failed to read configuration");
+    let addr = format!("127.0.0.1:{}", configuration.application_port);
+    let listener = TcpListener::bind(addr)?;
     build_app(listener)?.await
 }
