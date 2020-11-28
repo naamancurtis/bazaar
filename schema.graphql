@@ -1,0 +1,24 @@
+type QueryRoot {
+	customer(id: UUID!): Customer!
+}
+scalar UUID
+type Customer {
+	id: UUID!
+	email: String!
+	firstName: String!
+	lastName: String!
+	createdAt: DateTime!
+}
+"""
+Implement the DateTime<Utc> scalar
+
+The input/output is a string in RFC3339 format.
+"""
+scalar DateTime
+type MutationRoot {
+	createCustomer(email: String!, firstName: String!, lastName: String!): Customer!
+}
+schema {
+	query: QueryRoot
+	mutation: MutationRoot
+}

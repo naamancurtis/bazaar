@@ -3,13 +3,20 @@ use async_graphql::{EmptySubscription, Schema};
 use sqlx::PgPool;
 use std::net::TcpListener;
 
-use crate::{routes::*, MutationRoot, QueryRoot};
+use crate::{routes::*, BazarSchema, MutationRoot, QueryRoot};
+
+pub fn generate_schema(connection: Option<PgPool>) -> BazarSchema {
+    if let Some(connection) = connection {
+        Schema::build(QueryRoot, MutationRoot, EmptySubscription)
+            .data(connection)
+            .finish()
+    } else {
+        Schema::build(QueryRoot, MutationRoot, EmptySubscription).finish()
+    }
+}
 
 pub fn build_app(listener: TcpListener, connection: PgPool) -> Result<Server, std::io::Error> {
-    dbg!(&listener, &connection);
-    let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription)
-        .data(connection.clone())
-        .finish();
+    let schema = generate_schema(Some(connection.clone()));
 
     let server = HttpServer::new(move || {
         App::new()

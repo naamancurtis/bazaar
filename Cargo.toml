@@ -3,6 +3,7 @@ name = "bazar"
 version = "0.1.0"
 authors = ["Naaman <naaman.the.dev@gmail.com>"]
 edition = "2018"
+default-run = "app"
 
 [lib]
 path = "src/lib.rs"
@@ -10,6 +11,10 @@ path = "src/lib.rs"
 [[bin]]
 path = "src/main.rs"
 name = "app"
+
+[[bin]]
+path = "src/generate_schema.rs"
+name = "schema"
 
 [dependencies]
 actix-web = "3.3.0"
@@ -33,6 +38,7 @@ tracing-futures = "0.2.4"
 tracing-log = "0.1.1"
 tracing-bunyan-formatter = "0.1.7"
 config = { version = "0.10.1", default-features = false, features = ["yaml"] }
+graphql_client = "0.9.0"
 
 [dev-dependencies]
 reqwest = { version = "0.10.9", features = ["json"] } 

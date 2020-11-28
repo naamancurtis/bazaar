@@ -1,5 +1,6 @@
 use async_graphql::{Context, EmptySubscription, Object, Result, Schema, SimpleObject};
 use chrono::{DateTime, Utc};
+use serde::Deserialize;
 use sqlx::{query_as, PgPool};
 use uuid::Uuid;
 
@@ -40,13 +41,14 @@ impl MutationRoot {
     }
 }
 
-#[derive(Debug, SimpleObject)]
+#[derive(Debug, SimpleObject, Deserialize)]
+#[serde(rename_all(serialize = "snake_case", deserialize = "camelCase"))]
 pub struct Customer {
-    id: Uuid,
-    email: String,
-    first_name: String,
-    last_name: String,
-    created_at: DateTime<Utc>,
+    pub id: Uuid,
+    pub email: String,
+    pub first_name: String,
+    pub last_name: String,
+    pub created_at: DateTime<Utc>,
 }
 
 impl Customer {
@@ -63,13 +65,14 @@ impl Customer {
         last_name: String,
         pool: &PgPool,
     ) -> Result<Customer> {
+        dbg!(&email, &first_name, &last_name);
         let new_customer = query_as!(
             Customer,
             r#"
-				INSERT INTO customers ( id, email, first_name, last_name, created_at )
-				VALUES ( $1, $2, $3, $4, $5 )
-				RETURNING *
-				"#,
+        INSERT INTO customers ( id, email, first_name, last_name, created_at )
+        VALUES ( $1, $2, $3, $4, $5 )
+        RETURNING *
+        "#,
             Uuid::new_v4(),
             email,
             first_name,
