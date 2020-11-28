@@ -1,9 +1,10 @@
-use bazar::Customer;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::fmt;
 use uuid::Uuid;
+
+use bazaar::Customer;
 
 #[actix_rt::test]
 async fn health_check_works() {
@@ -55,12 +56,12 @@ async fn create_customer_mutation_works() -> Result<(), Box<dyn std::error::Erro
     let response = client.post(&app.address).json(&body).send().await?;
 
     #[derive(Debug, Deserialize)]
-    struct ExpectedResponse {
+    struct CreateCustomerResponse {
         #[serde(rename = "createCustomer")]
         create_customer: Customer,
     }
 
-    let response = response.json::<Response<ExpectedResponse>>().await?;
+    let response = response.json::<Response<CreateCustomerResponse>>().await?;
 
     let customer = response
         .data
@@ -85,12 +86,12 @@ pub async fn spawn_app() -> TestApp {
     let listener = TcpListener::bind("127.0.0.1:0").expect("failed to bind random port");
     let port = listener.local_addr().unwrap().port();
 
-    let configuration = bazar::get_configuration().expect("failed to read configuration");
+    let configuration = bazaar::get_configuration().expect("failed to read configuration");
     let pool = PgPool::connect(&configuration.database.generate_connection_string())
         .await
         .expect("failed to connect to database");
 
-    let server = bazar::build_app(listener, pool.clone()).expect("failed to bind address");
+    let server = bazaar::build_app(listener, pool.clone()).expect("failed to bind address");
 
     let _ = tokio::spawn(server);
     TestApp {

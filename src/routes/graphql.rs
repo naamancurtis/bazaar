@@ -2,9 +2,9 @@ use actix_web::{web, HttpResponse};
 use async_graphql::http::{playground_source, GraphQLPlaygroundConfig};
 use async_graphql_actix_web::{Request, Response};
 
-use crate::graphql::BazarSchema;
+use crate::graphql::BazaarSchema;
 
-pub async fn graphql_index(schema: web::Data<BazarSchema>, req: Request) -> Response {
+pub async fn graphql_index(schema: web::Data<BazaarSchema>, req: Request) -> Response {
     schema.execute(req.into_inner()).await.into()
 }
 

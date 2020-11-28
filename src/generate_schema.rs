@@ -1,4 +1,4 @@
-use bazar::generate_schema;
+use bazaar::generate_schema;
 use std::fs::File;
 use std::io::prelude::*;
 

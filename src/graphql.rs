@@ -4,7 +4,7 @@ use serde::Deserialize;
 use sqlx::{query_as, PgPool};
 use uuid::Uuid;
 
-pub type BazarSchema = Schema<QueryRoot, MutationRoot, EmptySubscription>;
+pub type BazaarSchema = Schema<QueryRoot, MutationRoot, EmptySubscription>;
 
 pub struct QueryRoot;
 

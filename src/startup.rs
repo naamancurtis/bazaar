@@ -3,9 +3,9 @@ use async_graphql::{EmptySubscription, Schema};
 use sqlx::PgPool;
 use std::net::TcpListener;
 
-use crate::{routes::*, BazarSchema, MutationRoot, QueryRoot};
+use crate::{routes::*, BazaarSchema, MutationRoot, QueryRoot};
 
-pub fn generate_schema(connection: Option<PgPool>) -> BazarSchema {
+pub fn generate_schema(connection: Option<PgPool>) -> BazaarSchema {
     if let Some(connection) = connection {
         Schema::build(QueryRoot, MutationRoot, EmptySubscription)
             .data(connection)

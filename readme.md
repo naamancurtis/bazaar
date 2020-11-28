@@ -1,4 +1,4 @@
-# Bazar
+# Bazaar
 
 ## Tooling
 
@@ -9,7 +9,7 @@
 
 ## Database Migrations
 
-### Creating Migrations
+### Creating Migrations
 
 ```sh
 # Ensure $DATABASE_URL is correctly set

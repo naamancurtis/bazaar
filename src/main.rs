@@ -1,4 +1,4 @@
-use bazar::{build_app, get_configuration};
+use bazaar::{build_app, get_configuration};
 use sqlx::PgPool;
 use std::net::TcpListener;
 
