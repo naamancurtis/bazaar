@@ -1,14 +1,19 @@
 use actix_web::{dev::Server, guard, web, App, HttpServer};
-use async_graphql::{EmptyMutation, EmptySubscription, Schema};
+use async_graphql::{EmptySubscription, Schema};
+use sqlx::PgPool;
 use std::net::TcpListener;
 
-use crate::{routes::*, QueryRoot};
+use crate::{routes::*, MutationRoot, QueryRoot};
 
-pub fn build_app(listener: TcpListener) -> Result<Server, std::io::Error> {
-    let schema = Schema::build(QueryRoot, EmptyMutation, EmptySubscription).finish();
+pub fn build_app(listener: TcpListener, connection: PgPool) -> Result<Server, std::io::Error> {
+    let schema = Schema::build(QueryRoot, MutationRoot, EmptySubscription)
+        .data(connection.clone())
+        .finish();
+
     let server = HttpServer::new(move || {
         App::new()
             .data(schema.clone())
+            .data(connection.clone())
             .service(web::resource("/").guard(guard::Post()).to(graphql_index))
             .service(
                 web::resource("/")
@@ -19,5 +24,6 @@ pub fn build_app(listener: TcpListener) -> Result<Server, std::io::Error> {
     })
     .listen(listener)?
     .run();
+
     Ok(server)
 }
