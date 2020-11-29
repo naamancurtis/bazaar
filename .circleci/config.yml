@@ -16,9 +16,10 @@ jobs:
           keys:
             - v1-cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
       - run:
-          name: Migrate Database
+          name: Migrate database
           command: |
-            sudo apt-get install libpq-dev -y
+            sudo apt-get update
+            sudo apt-get install postgresql-client
             cargo install --version=0.2.0 sqlx-cli --no-default-features --features postgres
             SKIP_DOCKER=true ./scripts/init_db.sh
       - run:
@@ -89,9 +90,10 @@ jobs:
           name: Install Clippy
           command: rustup component add clippy
       - run:
-          name: Migrate Database
+          name: Migrate database
           command: |
-            sudo apt-get install libpq-dev -y
+            sudo apt-get update
+            sudo apt-get install postgresql-client
             cargo install --version=0.2.0 sqlx-cli --no-default-features --features postgres
             SKIP_DOCKER=true ./scripts/init_db.sh
       - run:
