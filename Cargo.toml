@@ -40,6 +40,7 @@ tracing-bunyan-formatter = "0.1.7"
 config = { version = "0.10.1", default-features = false, features = ["yaml"] }
 graphql_client = "0.9.0"
 tracing-actix-web = "0.2.1"
+serde-aux = "1.1.0"
 
 [dev-dependencies]
 reqwest = { version = "0.10.9", features = ["json"] } 

@@ -14,7 +14,7 @@ async fn main() -> std::io::Result<()> {
 
     let connection = PgPoolOptions::new()
         .connect_timeout(std::time::Duration::from_secs(2))
-        .connect(&configuration.database.generate_connection_string())
+        .connect_with(configuration.database.with_db())
         .await
         .expect("failed to connect to database");
 
