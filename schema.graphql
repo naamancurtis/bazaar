@@ -1,5 +1,6 @@
 type QueryRoot {
-	customer(id: UUID!): Customer!
+	customerById(id: UUID!): Customer!
+	customerByEmail(email: String!): Customer!
 }
 scalar UUID
 type Customer {
