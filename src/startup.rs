@@ -2,6 +2,7 @@ use actix_web::{dev::Server, guard, web, App, HttpServer};
 use async_graphql::{EmptySubscription, Schema};
 use sqlx::PgPool;
 use std::net::TcpListener;
+use tracing_actix_web::TracingLogger;
 
 use crate::{routes::*, BazaarSchema, MutationRoot, QueryRoot};
 
@@ -20,6 +21,7 @@ pub fn build_app(listener: TcpListener, connection: PgPool) -> Result<Server, st
 
     let server = HttpServer::new(move || {
         App::new()
+            .wrap(TracingLogger)
             .data(schema.clone())
             .data(connection.clone())
             .service(web::resource("/").guard(guard::Post()).to(graphql_index))

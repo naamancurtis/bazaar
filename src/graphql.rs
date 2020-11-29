@@ -10,6 +10,7 @@ pub struct QueryRoot;
 
 #[Object]
 impl QueryRoot {
+    #[tracing::instrument(name = "customer_by_id", skip(self, ctx))]
     async fn customer_by_id(&self, ctx: &Context<'_>, id: Uuid) -> Result<Customer> {
         let pool = ctx.data::<PgPool>()?;
         match Customer::find_by_id(id, pool).await {
@@ -22,6 +23,7 @@ impl QueryRoot {
         }
     }
 
+    #[tracing::instrument(name = "customer_by_email", skip(self, ctx))]
     async fn customer_by_email(&self, ctx: &Context<'_>, email: String) -> Result<Customer> {
         let pool = ctx.data::<PgPool>()?;
         match Customer::find_by_email(email, pool).await {
@@ -39,6 +41,7 @@ pub struct MutationRoot;
 
 #[Object]
 impl MutationRoot {
+    #[tracing::instrument(name = "create_customer", skip(self, ctx))]
     async fn create_customer(
         &self,
         ctx: &Context<'_>,
@@ -64,6 +67,7 @@ pub struct Customer {
 }
 
 impl Customer {
+    #[tracing::instrument(skip(pool), fields(model = "Customer"))]
     pub async fn find_by_id(id: Uuid, pool: &PgPool) -> Result<Self> {
         let customer = query_as!(Customer, r#"SELECT * FROM customers WHERE id = $1"#, id)
             .fetch_one(pool)
@@ -71,6 +75,7 @@ impl Customer {
         Ok(customer)
     }
 
+    #[tracing::instrument(skip(pool), fields(model = "Customer"))]
     pub async fn find_by_email(email: String, pool: &PgPool) -> Result<Self> {
         let customer = query_as!(
             Customer,
@@ -82,13 +87,13 @@ impl Customer {
         Ok(customer)
     }
 
+    #[tracing::instrument(skip(pool), fields(model = "Customer"))]
     pub async fn new(
         email: String,
         first_name: String,
         last_name: String,
         pool: &PgPool,
     ) -> Result<Customer> {
-        dbg!(&email, &first_name, &last_name);
         let new_customer = query_as!(
             Customer,
             r#"

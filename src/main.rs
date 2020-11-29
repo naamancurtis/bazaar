@@ -1,9 +1,15 @@
-use bazaar::{build_app, get_configuration};
+use bazaar::{
+    build_app, get_configuration,
+    telemetry::{generate_subscriber, init_subscriber},
+};
 use sqlx::PgPool;
 use std::net::TcpListener;
 
 #[actix_rt::main]
 async fn main() -> std::io::Result<()> {
+    let subscriber = generate_subscriber(String::from("bazaar"), String::from("info"));
+    init_subscriber(subscriber);
+
     let configuration = get_configuration().expect("failed to read configuration");
 
     let connection = PgPool::connect(&configuration.database.generate_connection_string())
