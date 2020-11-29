@@ -1,6 +1,7 @@
 version: 2
 jobs:
   build-and-test:
+    resource_class: small
     docker:
       - image: circleci/rust
       - image: circleci/postgres:alpine
@@ -37,6 +38,7 @@ jobs:
           command: cargo test
 
   security:
+    resource_class: small
     docker:
       - image: circleci/rust
     steps:
@@ -63,6 +65,7 @@ jobs:
           command: cargo audit
 
   format:
+    resource_class: small
     docker:
       - image: circleci/rust
     steps:
@@ -78,6 +81,7 @@ jobs:
           command: cargo fmt --all -- --check
 
   lint:
+    resource_class: small
     docker:
       - image: circleci/rust
       - image: circleci/postgres:alpine
@@ -100,14 +104,6 @@ jobs:
           name: Linting
           command: cargo clippy -- -D warnings
 
-  coverage:
-    machine: true
-    steps:
-      - checkout
-      - run:
-          name: Coverage with docker
-          command: docker run --security-opt seccomp=unconfined -v "${PWD}:/volume" xd009642/tarpaulin cargo tarpaulin --ignore-tests
-
 workflows:
   version: 2
   build-test:
@@ -128,7 +124,3 @@ workflows:
           filters:
             tags:
               only: /.*/
-      - coverage:
-          filters:
-            tags:
-              only: /.*/u
