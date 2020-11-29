@@ -36,6 +36,12 @@ jobs:
       - run:
           name: Run all tests
           command: cargo test
+      - run:
+          name: Check sqlx metadata file
+          command: cargo sqlx prepare --check -- --lib
+      - run:
+          name: Generate graphql schema
+          command: cargo run --bin schema
 
   security:
     resource_class: small

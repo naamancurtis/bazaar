@@ -4,6 +4,7 @@ use async_graphql_actix_web::{Request, Response};
 
 use crate::graphql::BazaarSchema;
 
+#[tracing::instrument(name = "graphql", skip(schema, req))]
 pub async fn graphql_index(schema: web::Data<BazaarSchema>, req: Request) -> Response {
     schema.execute(req.into_inner()).await.into()
 }

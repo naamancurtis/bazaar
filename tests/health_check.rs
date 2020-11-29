@@ -1,10 +1,32 @@
+use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
 use std::collections::HashMap;
 use std::fmt;
 use uuid::Uuid;
 
-use bazaar::{configuration::DatabaseSettings, Customer};
+use bazaar::{
+    configuration::DatabaseSettings,
+    telemetry::{generate_subscriber, init_subscriber},
+    Customer,
+};
+
+lazy_static! {
+    /// To ensure logs are only outputted in tests when requred, by default
+    /// tests run with no logs being captured
+    ///
+    /// In order to set logs to be captured during tests run them with:
+    /// `TEST_LOG=true cargo test health_check_works | bunyan`
+    static ref TRACING: () = {
+        let filter = if std::env::var("TEST_LOG").is_ok() {
+            "debug"
+        } else {
+            ""
+        };
+        let subscriber = generate_subscriber("test".to_string(), filter.into());
+        init_subscriber(subscriber);
+    };
+}
 
 #[actix_rt::test]
 async fn health_check_works() {
@@ -187,6 +209,8 @@ pub struct TestApp {
 }
 
 pub async fn spawn_app() -> TestApp {
+    lazy_static::initialize(&TRACING);
+
     let listener = TcpListener::bind("127.0.0.1:0").expect("failed to bind random port");
     let port = listener.local_addr().unwrap().port();
 
@@ -207,7 +231,7 @@ pub async fn spawn_app() -> TestApp {
 }
 
 pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
-    let mut connection = PgConnection::connect(&config.generate_connection_without_database())
+    let mut connection = PgConnection::connect_with(&config.without_db())
         .await
         .expect("failed to connect to database");
     connection
@@ -215,7 +239,7 @@ pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
         .await
         .expect("failed to create database");
 
-    let pool = PgPool::connect(&config.generate_connection_string())
+    let pool = PgPool::connect_with(config.with_db())
         .await
         .expect("failed to connect to database");
     sqlx::migrate!("./migrations")

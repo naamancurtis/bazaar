@@ -1,5 +1,14 @@
 # Bazaar
 
+[![CircleCI Build Status](https://circleci.com/gh/naamancurtis/bazaar.svg?style=shield)](https://app.circleci.com/pipelines/github/naamancurtis/bazaar)
+
+## Docker
+
+```sh
+docker build --tag bazaar --file Dockerfile .
+docker run -p 8000:8000 bazaar
+```
+
 ## Tooling
 
 | Name                                                                 | Purpose                                        | Installation                                    |
@@ -25,4 +34,10 @@ If you need to run them manually, you can do so with the sqlx CLI:
 
 ```sh
 sqlx migrate run
+```
+
+### Preparing for SQLX offline
+
+```sh
+cargo sqlx prepare -- --bin app
 ```
