@@ -5,5 +5,6 @@ CREATE TABLE customers(
 	first_name TEXT NOT NULL,
 	last_name TEXT NOT NULL,
 	created_at timestamptz NOT NULL
-)
+);
 
+CREATE INDEX email_address_idx ON customers (email);

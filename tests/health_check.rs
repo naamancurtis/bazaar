@@ -4,7 +4,7 @@ use std::collections::HashMap;
 use std::fmt;
 use uuid::Uuid;
 
-use bazaar::Customer;
+use bazaar::{configuration::DatabaseSettings, Customer};
 
 #[actix_rt::test]
 async fn health_check_works() {
@@ -74,7 +74,111 @@ async fn create_customer_mutation_works() -> Result<(), Box<dyn std::error::Erro
     Ok(())
 }
 
-use sqlx::PgPool;
+#[actix_rt::test]
+async fn query_customer_by_id_mutation_works() -> Result<(), Box<dyn std::error::Error>> {
+    let app = spawn_app().await;
+    let client = reqwest::Client::new();
+
+    let customer_id = insert_default_customer(&app.db_pool)
+        .await
+        .expect("default customer failed to be created");
+
+    let graphql_mutatation = r#"
+        query customerById($id: UUID!) {
+            customerById(id: $id) {
+                id,
+                firstName,
+                lastName,
+                email,
+                createdAt
+            }
+        }
+    "#;
+
+    let body = json!({
+        "query": graphql_mutatation,
+        "variables": {
+            "id": customer_id,
+        }
+    });
+
+    dbg!(&body);
+
+    let response = client.post(&app.address).json(&body).send().await?;
+
+    #[derive(Debug, Deserialize)]
+    struct CustomerQueryResponse {
+        #[serde(rename = "customerById")]
+        customer_by_id: Customer,
+    }
+
+    let response = response.json::<Response<CustomerQueryResponse>>().await?;
+    dbg!(&response);
+
+    let customer = response
+        .data
+        .expect("successful response should contain data")
+        .customer_by_id;
+
+    assert_eq!(customer.email, format!("{}@test.com", Uuid::nil()));
+    assert_eq!(customer.first_name, Uuid::nil().to_string());
+    assert_eq!(customer.last_name, Uuid::nil().to_string());
+    Ok(())
+}
+
+#[actix_rt::test]
+async fn query_customer_by_email_mutation_works() -> Result<(), Box<dyn std::error::Error>> {
+    let app = spawn_app().await;
+    let client = reqwest::Client::new();
+
+    insert_default_customer(&app.db_pool)
+        .await
+        .expect("default customer failed to be created");
+
+    let graphql_mutatation = r#"
+        query customerByEmail($email: String!) {
+            customerByEmail(email: $email) {
+                id,
+                firstName,
+                lastName,
+                email,
+                createdAt
+            }
+        }
+    "#;
+
+    let body = json!({
+        "query": graphql_mutatation,
+        "variables": {
+            "email": format!("{}@test.com", Uuid::nil()),
+        }
+    });
+
+    dbg!(&body);
+
+    let response = client.post(&app.address).json(&body).send().await?;
+
+    #[derive(Debug, Deserialize)]
+    struct CustomerQueryResponse {
+        #[serde(rename = "customerByEmail")]
+        customer_by_email: Customer,
+    }
+
+    let response = response.json::<Response<CustomerQueryResponse>>().await?;
+    dbg!(&response);
+
+    let customer = response
+        .data
+        .expect("successful response should contain data")
+        .customer_by_email;
+
+    assert_eq!(customer.email, format!("{}@test.com", Uuid::nil()));
+    assert_eq!(customer.first_name, Uuid::nil().to_string());
+    assert_eq!(customer.last_name, Uuid::nil().to_string());
+    Ok(())
+}
+
+use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::net::TcpListener;
 
 pub struct TestApp {
@@ -86,10 +190,12 @@ pub async fn spawn_app() -> TestApp {
     let listener = TcpListener::bind("127.0.0.1:0").expect("failed to bind random port");
     let port = listener.local_addr().unwrap().port();
 
-    let configuration = bazaar::get_configuration().expect("failed to read configuration");
-    let pool = PgPool::connect(&configuration.database.generate_connection_string())
-        .await
-        .expect("failed to connect to database");
+    let mut configuration = bazaar::get_configuration().expect("failed to read configuration");
+
+    let database_name = Uuid::new_v4().to_string();
+    configuration.set_database_name(database_name);
+
+    let pool = configure_database(&configuration.database).await;
 
     let server = bazaar::build_app(listener, pool.clone()).expect("failed to bind address");
 
@@ -98,6 +204,36 @@ pub async fn spawn_app() -> TestApp {
         address: format!("http://127.0.0.1:{}", port),
         db_pool: pool,
     }
+}
+
+pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
+    let mut connection = PgConnection::connect(&config.generate_connection_without_database())
+        .await
+        .expect("failed to connect to database");
+    connection
+        .execute(&*format!(r#"CREATE DATABASE "{}";"#, config.database_name))
+        .await
+        .expect("failed to create database");
+
+    let pool = PgPool::connect(&config.generate_connection_string())
+        .await
+        .expect("failed to connect to database");
+    sqlx::migrate!("./migrations")
+        .run(&pool)
+        .await
+        .expect("failed to run database migrations");
+    pool
+}
+
+pub async fn insert_default_customer(pool: &PgPool) -> Result<Uuid, Box<dyn std::error::Error>> {
+    let email = format!("{}@test.com", Uuid::nil());
+    let first_name = Uuid::nil().to_string();
+    let last_name = Uuid::nil().to_string();
+
+    let customer = Customer::new(email, first_name, last_name, pool)
+        .await
+        .expect("failed to insert default customer");
+    Ok(customer.id)
 }
 
 // Taken from https://github.com/graphql-rust/graphql-client

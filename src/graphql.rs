@@ -10,9 +10,21 @@ pub struct QueryRoot;
 
 #[Object]
 impl QueryRoot {
-    async fn customer(&self, ctx: &Context<'_>, id: Uuid) -> Result<Customer> {
+    async fn customer_by_id(&self, ctx: &Context<'_>, id: Uuid) -> Result<Customer> {
         let pool = ctx.data::<PgPool>()?;
-        match Customer::find(id, pool).await {
+        match Customer::find_by_id(id, pool).await {
+            Ok(customer) => Ok(customer),
+            // @TODO improve error handling
+            Err(e) => Err(async_graphql::Error::new(format!(
+                "Message: {}, extensions: {:?}",
+                e.message, e.extensions
+            ))),
+        }
+    }
+
+    async fn customer_by_email(&self, ctx: &Context<'_>, email: String) -> Result<Customer> {
+        let pool = ctx.data::<PgPool>()?;
+        match Customer::find_by_email(email, pool).await {
             Ok(customer) => Ok(customer),
             // @TODO improve error handling
             Err(e) => Err(async_graphql::Error::new(format!(
@@ -52,10 +64,21 @@ pub struct Customer {
 }
 
 impl Customer {
-    pub async fn find(id: Uuid, pool: &PgPool) -> Result<Self> {
+    pub async fn find_by_id(id: Uuid, pool: &PgPool) -> Result<Self> {
         let customer = query_as!(Customer, r#"SELECT * FROM customers WHERE id = $1"#, id)
             .fetch_one(pool)
             .await?;
+        Ok(customer)
+    }
+
+    pub async fn find_by_email(email: String, pool: &PgPool) -> Result<Self> {
+        let customer = query_as!(
+            Customer,
+            r#"SELECT * FROM customers WHERE email = $1"#,
+            email
+        )
+        .fetch_one(pool)
+        .await?;
         Ok(customer)
     }
 

@@ -22,11 +22,24 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
     settings.try_into()
 }
 
+impl Settings {
+    pub fn set_database_name(&mut self, name: String) {
+        self.database.database_name = name;
+    }
+}
+
 impl DatabaseSettings {
     pub fn generate_connection_string(&self) -> String {
         format!(
             "postgres://{}:{}@{}:{}/{}",
             self.username, self.password, self.host, self.port, self.database_name
+        )
+    }
+
+    pub fn generate_connection_without_database(&self) -> String {
+        format!(
+            "postgres://{}:{}@{}:{}",
+            self.username, self.password, self.host, self.port,
         )
     }
 }

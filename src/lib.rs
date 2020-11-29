@@ -1,4 +1,4 @@
-mod configuration;
+pub mod configuration;
 mod graphql;
 pub mod routes;
 mod startup;
