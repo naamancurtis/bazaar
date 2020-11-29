@@ -38,7 +38,7 @@ jobs:
           command: cargo test
       - run:
           name: Check sqlx metadata file
-          command: cargo sqlx prepare --check -- --bin app
+          command: cargo sqlx prepare --check -- --lib
       - run:
           name: Generate graphql schema
           command: cargo run --bin schema
