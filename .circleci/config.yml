@@ -64,7 +64,7 @@ jobs:
           command: rustc --version; cargo --version; rustup --version
       - run:
           name: Install formatter
-          command: rustup component add rstfmt
+          command: rustup component add rustfmt
       - run:
           name: Formatting
           command: cargo fmt --all -- --check
