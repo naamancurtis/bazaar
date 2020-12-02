@@ -1,7 +1,49 @@
 {
   "db": "PostgreSQL",
-  "1683f12c3ffd5eb1c46b9770c628a3893e156df57ac06d8c22299c2aa20f25e7": {
-    "query": "SELECT * FROM customers WHERE email = $1",
+  "1ab99ac52adc46e96b069f84c21cd356d59f8b872037ee178433b7da14f6e6d8": {
+    "query": "SELECT * FROM customers",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "email",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "first_name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "last_name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 4,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "2c9e5c4fb16898fc72082b6ee51ae18687e35e420175d2f96e5504f536a4ba85": {
+    "query": "\n        INSERT INTO customers ( id, email, first_name, last_name, created_at )\n        VALUES ( $1, $2, $3, $4, $5 )\n        RETURNING *;\n        ",
     "describe": {
       "columns": [
         {
@@ -32,7 +74,11 @@
       ],
       "parameters": {
         "Left": [
-          "Text"
+          "Uuid",
+          "Text",
+          "Text",
+          "Text",
+          "Timestamptz"
         ]
       },
       "nullable": [
@@ -88,8 +134,8 @@
       ]
     }
   },
-  "8ec416f7cf1ab09d698141b4f318dd6c3e3b93b3445610b9ddab2667254a544c": {
-    "query": "\n        INSERT INTO customers ( id, email, first_name, last_name, created_at )\n        VALUES ( $1, $2, $3, $4, $5 )\n        RETURNING *\n        ",
+  "91348d5c99ab77c9b5c172d19ee16f7e7d2dc4fdff0bda64e2aed1b4249336cc": {
+    "query": "\n        UPDATE customers\n        SET email = $1, first_name = $2, last_name = $3\n        WHERE id = $4\n        RETURNING *;\n            ",
     "describe": {
       "columns": [
         {
@@ -120,11 +166,54 @@
       ],
       "parameters": {
         "Left": [
-          "Uuid",
           "Text",
           "Text",
           "Text",
-          "Timestamptz"
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "d06aaacbdbb88134c920fa084923ab7cbf1096b4b033d4823cebe3a4b67a6da3": {
+    "query": "\n        SELECT * FROM customers WHERE email = $1;\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "email",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "first_name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "last_name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 4,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
         ]
       },
       "nullable": [

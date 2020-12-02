@@ -9,6 +9,13 @@ docker build --tag bazaar --file Dockerfile .
 docker run -p 8000:8000 bazaar
 ```
 
+## GraphQL Schema
+
+_Although it's not pretty_ there's a small binary in the workspace which can be
+used to generate the graphql schema for the application and write it to
+`schema.graphql`. To do so just run `cargo run --bin schema`. The easiest way to
+keep it up to date is to create a basic `pre-commit` hook to run it for you.
+
 ## Tooling
 
 | Name                                                                 | Purpose                                        | Installation                                    |
@@ -38,6 +45,10 @@ sqlx migrate run
 
 ### Preparing for SQLX offline
 
+CI will fail if the offline SQLX schema hasn't been updated when it should have
+been. Again it's probably useful to add this as a `pre-commit` hook on the
+project
+
 ```sh
-cargo sqlx prepare -- --bin app
+cargo sqlx prepare -- --lib
 ```

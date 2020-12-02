@@ -7,8 +7,8 @@ use uuid::Uuid;
 
 use bazaar::{
     configuration::DatabaseSettings,
+    models::Customer,
     telemetry::{generate_subscriber, init_subscriber},
-    Customer,
 };
 
 lazy_static! {
@@ -131,7 +131,7 @@ async fn query_customer_by_id_mutation_works() -> Result<(), Box<dyn std::error:
     #[derive(Debug, Deserialize)]
     struct CustomerQueryResponse {
         #[serde(rename = "customerById")]
-        customer_by_id: Customer,
+        customer_by_id: Option<Customer>,
     }
 
     let response = response.json::<Response<CustomerQueryResponse>>().await?;
@@ -141,6 +141,8 @@ async fn query_customer_by_id_mutation_works() -> Result<(), Box<dyn std::error:
         .data
         .expect("successful response should contain data")
         .customer_by_id;
+    assert!(customer.is_some());
+    let customer = customer.unwrap();
 
     assert_eq!(customer.email, format!("{}@test.com", Uuid::nil()));
     assert_eq!(customer.first_name, Uuid::nil().to_string());
@@ -183,7 +185,7 @@ async fn query_customer_by_email_mutation_works() -> Result<(), Box<dyn std::err
     #[derive(Debug, Deserialize)]
     struct CustomerQueryResponse {
         #[serde(rename = "customerByEmail")]
-        customer_by_email: Customer,
+        customer_by_email: Option<Customer>,
     }
 
     let response = response.json::<Response<CustomerQueryResponse>>().await?;
@@ -194,12 +196,71 @@ async fn query_customer_by_email_mutation_works() -> Result<(), Box<dyn std::err
         .expect("successful response should contain data")
         .customer_by_email;
 
+    assert!(customer.is_some());
+    let customer = customer.unwrap();
+
     assert_eq!(customer.email, format!("{}@test.com", Uuid::nil()));
     assert_eq!(customer.first_name, Uuid::nil().to_string());
     assert_eq!(customer.last_name, Uuid::nil().to_string());
     Ok(())
 }
 
+#[actix_rt::test]
+async fn update_customer_mutation_works() -> Result<(), Box<dyn std::error::Error>> {
+    let app = spawn_app().await;
+    let client = reqwest::Client::new();
+
+    let customer_id = insert_default_customer(&app.db_pool)
+        .await
+        .expect("default customer failed to be created");
+
+    let graphql_mutatation = r#"
+        mutation updateCustomer($id: UUID!, $update: CustomerUpdate) {
+            updateCustomer(id: $id, update: $update) {
+                id,
+                firstName,
+                lastName,
+                email,
+                createdAt
+            }
+        }
+    "#;
+
+    let body = json!({
+        "query": graphql_mutatation,
+        "variables": {
+            "id": customer_id,
+            "update": {
+                "email": "updated@test.com",
+                "firstName": "updated",
+                "lastName": "updated"
+            }
+        }
+    });
+
+    dbg!(&body);
+
+    let response = client.post(&app.address).json(&body).send().await?;
+
+    #[derive(Debug, Deserialize)]
+    struct CustomerUpdateResponse {
+        #[serde(rename = "updateCustomer")]
+        update_customer: Customer,
+    }
+
+    let response = response.json::<Response<CustomerUpdateResponse>>().await?;
+    dbg!(&response);
+
+    let customer = response
+        .data
+        .expect("successful response should contain data")
+        .update_customer;
+
+    assert_eq!(customer.email, format!("{}@test.com", "updated"));
+    assert_eq!(customer.first_name, "updated".to_string());
+    assert_eq!(customer.last_name, "updated".to_string());
+    Ok(())
+}
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::net::TcpListener;
 
