@@ -7,8 +7,8 @@ use uuid::Uuid;
 
 use bazaar::{
     configuration::DatabaseSettings,
+    models::Customer,
     telemetry::{generate_subscriber, init_subscriber},
-    Customer,
 };
 
 lazy_static! {
