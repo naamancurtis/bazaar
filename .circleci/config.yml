@@ -93,7 +93,6 @@ jobs:
       SQLX_OFFLINE: "true"
     docker:
       - image: circleci/rust
-      - image: circleci/postgres:alpine
     steps:
       - checkout
       - run:
@@ -102,13 +101,6 @@ jobs:
       - run:
           name: Install Clippy
           command: rustup component add clippy
-      - run:
-          name: Migrate database
-          command: |
-            sudo apt-get update
-            sudo apt-get install postgresql-client
-            cargo install --version=0.2.0 sqlx-cli --no-default-features --features postgres
-            SKIP_DOCKER=true ./scripts/init_db.sh
       - run:
           name: Linting
           command: cargo clippy -- -D warnings
