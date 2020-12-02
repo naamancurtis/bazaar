@@ -1,5 +1,5 @@
 use actix_web::{dev::Server, guard, web, App, HttpServer};
-use async_graphql::{EmptySubscription, Schema};
+use async_graphql::{extensions::ApolloTracing, EmptySubscription, Schema};
 use sqlx::PgPool;
 use std::net::TcpListener;
 use tracing_actix_web::TracingLogger;
@@ -9,10 +9,13 @@ use crate::{routes::*, BazaarSchema, MutationRoot, QueryRoot};
 pub fn generate_schema(connection: Option<PgPool>) -> BazaarSchema {
     if let Some(connection) = connection {
         Schema::build(QueryRoot, MutationRoot, EmptySubscription)
+            .extension(ApolloTracing)
             .data(connection)
             .finish()
     } else {
-        Schema::build(QueryRoot, MutationRoot, EmptySubscription).finish()
+        Schema::build(QueryRoot, MutationRoot, EmptySubscription)
+            .extension(ApolloTracing)
+            .finish()
     }
 }
 

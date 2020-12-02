@@ -18,6 +18,12 @@ The input/output is a string in RFC3339 format.
 scalar DateTime
 type MutationRoot {
 	createCustomer(email: String!, firstName: String!, lastName: String!): Customer!
+	updateCustomer(id: UUID!, update: CustomerUpdate!): Customer!
+}
+input CustomerUpdate {
+email: String!
+firstName: String!
+lastName: String!
 }
 schema {
 	query: QueryRoot
