@@ -1,8 +1,8 @@
 type QueryRoot {
-	customerById(id: UUID!): Customer!
-	customerByEmail(email: String!): Customer!
+	customers: [Customer!]!
+	customerById(id: UUID!): Customer
+	customerByEmail(email: String!): Customer
 }
-scalar UUID
 type Customer {
 	id: UUID!
 	email: String!
@@ -10,6 +10,7 @@ type Customer {
 	lastName: String!
 	createdAt: DateTime!
 }
+scalar UUID
 """
 Implement the DateTime<Utc> scalar
 
