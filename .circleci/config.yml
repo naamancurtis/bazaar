@@ -88,6 +88,9 @@ jobs:
 
   lint:
     resource_class: small
+    environment:
+      # Fail the build if there are warnings
+      SQLX_OFFLINE: "true"
     docker:
       - image: circleci/rust
       - image: circleci/postgres:alpine
