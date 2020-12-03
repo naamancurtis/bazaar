@@ -632,6 +632,7 @@ dependencies = [
  "chrono",
  "config",
  "dotenv",
+ "futures",
  "graphql_client",
  "lazy_static",
  "reqwest",

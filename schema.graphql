@@ -43,6 +43,8 @@ enum Currency {
 type MutationRoot {
 	createCustomer(email: String!, firstName: String!, lastName: String!): Customer!
 	updateCustomer(id: UUID!, update: CustomerUpdate!): Customer!
+	createAnonymousCart(currency: Currency!): ShoppingCart!
+	createKnownCart(id: UUID!, currency: Currency!): ShoppingCart!
 }
 input CustomerUpdate {
 email: String!

@@ -171,6 +171,84 @@
       ]
     }
   },
+  "b6324a56c15a5948f27dbd8309e5123c0da4ef441dc304e87bf1fe35b04a74c8": {
+    "query": "\n            SELECT cart_id FROM customers WHERE id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "cart_id",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        true
+      ]
+    }
+  },
+  "b947691d3ac40e78cd19241cfbbab0f3bb892c016a3c646780d09d0bbad37837": {
+    "query": "\n            INSERT INTO shopping_carts (id, cart_type, currency)\n            VALUES ( $1, $2, $3 )\n            RETURNING\n                id, \n                items, \n                cart_type, \n                price_before_discounts, \n                price_after_discounts,\n                discounts,\n                currency;\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "items",
+          "type_info": "VarcharArray"
+        },
+        {
+          "ordinal": 2,
+          "name": "cart_type",
+          "type_info": "Int2"
+        },
+        {
+          "ordinal": 3,
+          "name": "price_before_discounts",
+          "type_info": "Float8"
+        },
+        {
+          "ordinal": 4,
+          "name": "price_after_discounts",
+          "type_info": "Float8"
+        },
+        {
+          "ordinal": 5,
+          "name": "discounts",
+          "type_info": "UuidArray"
+        },
+        {
+          "ordinal": 6,
+          "name": "currency",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Int2",
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false
+      ]
+    }
+  },
   "ba487bad58a085b0c95ed3cb98e1c4b7558309367b3478f689c38cf1a1fa08a1": {
     "query": "\n            UPDATE customers\n            SET email = $1, first_name = $2, last_name = $3\n            WHERE id = $4\n            RETURNING *;\n            ",
     "describe": {
@@ -284,6 +362,19 @@
         true,
         false
       ]
+    }
+  },
+  "dba04fb90d6770fe4e38f818a71cda0341b9194ca6d6bd62f8745a8811bb11e0": {
+    "query": "\n            UPDATE customers\n            SET cart_id = $1\n            WHERE id = $2;\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Uuid"
+        ]
+      },
+      "nullable": []
     }
   },
   "df9e536fb1cf4fd51fc4a712e41a6e737110973f80c5541735e43b6a5a0c4c72": {

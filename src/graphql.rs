@@ -5,7 +5,7 @@ use async_graphql::{
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::models::{Customer, CustomerUpdate};
+use crate::models::{Currency, Customer, CustomerUpdate, ShoppingCart};
 
 pub type BazaarSchema = Schema<QueryRoot, MutationRoot, EmptySubscription>;
 
@@ -75,6 +75,7 @@ impl MutationRoot {
             .map_err(|e| async_graphql::Error::new(e.message))
     }
 
+    #[tracing::instrument(name = "update_customer", skip(self, ctx))]
     async fn update_customer(
         &self,
         ctx: &Context<'_>,
@@ -83,6 +84,31 @@ impl MutationRoot {
     ) -> Result<Customer> {
         let pool = ctx.data::<PgPool>()?;
         Customer::update(id, update, pool)
+            .await
+            .map_err(|e| async_graphql::Error::new(e.message))
+    }
+
+    #[tracing::instrument(name = "create_anonymous_cart", skip(self, ctx))]
+    async fn create_anonymous_cart(
+        &self,
+        ctx: &Context<'_>,
+        currency: Currency,
+    ) -> Result<ShoppingCart> {
+        let pool = ctx.data::<PgPool>()?;
+        ShoppingCart::new_anonymous(currency, pool)
+            .await
+            .map_err(|e| async_graphql::Error::new(e.message))
+    }
+
+    #[tracing::instrument(name = "create_known_cart", skip(self, ctx))]
+    async fn create_known_cart(
+        &self,
+        ctx: &Context<'_>,
+        id: Uuid,
+        currency: Currency,
+    ) -> Result<ShoppingCart> {
+        let pool = ctx.data::<PgPool>()?;
+        Customer::add_new_cart(id, currency, pool)
             .await
             .map_err(|e| async_graphql::Error::new(e.message))
     }

@@ -5,7 +5,17 @@ use std::hash::{Hash, Hasher};
 use std::str::FromStr;
 use uuid::Uuid;
 
-#[derive(Debug, async_graphql::Enum, Copy, Clone, Eq, PartialEq, Deserialize, strum::EnumString)]
+#[derive(
+    Debug,
+    async_graphql::Enum,
+    Copy,
+    Clone,
+    Eq,
+    PartialEq,
+    Deserialize,
+    strum::EnumString,
+    strum::ToString,
+)]
 pub enum Currency {
     GBP,
     USD,
@@ -69,6 +79,7 @@ pub struct ShoppingCart {
 }
 
 impl ShoppingCart {
+    #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
     pub async fn find_by_id(id: Uuid, pool: &PgPool) -> Result<Option<Self>> {
         let cart = query!(
             r#"
@@ -98,5 +109,52 @@ impl ShoppingCart {
         };
 
         Ok(Some(cart))
+    }
+
+    #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
+    pub async fn new_anonymous(currency: Currency, pool: &PgPool) -> Result<Self> {
+        ShoppingCart::new(Uuid::new_v4(), CartType::Anonymous, currency, pool).await
+    }
+
+    #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
+    pub async fn new_known(id: Uuid, currency: Currency, pool: &PgPool) -> Result<Self> {
+        ShoppingCart::new(id, CartType::Known, currency, pool).await
+    }
+}
+
+/// Private API
+impl ShoppingCart {
+    #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
+    async fn new(id: Uuid, cart_type: CartType, currency: Currency, pool: &PgPool) -> Result<Self> {
+        let cart = query!(
+            r#"
+            INSERT INTO shopping_carts (id, cart_type, currency)
+            VALUES ( $1, $2, $3 )
+            RETURNING
+                id, 
+                items, 
+                cart_type, 
+                price_before_discounts, 
+                price_after_discounts,
+                discounts,
+                currency;
+            "#,
+            id,
+            cart_type as i16,
+            currency.to_string()
+        )
+        .fetch_one(pool)
+        .await?;
+
+        let cart = Self {
+            id: cart.id,
+            items: cart.items.unwrap_or_else(Vec::default),
+            cart_type: CartType::from(cart.cart_type),
+            price_before_discounts: cart.price_before_discounts,
+            discounts: cart.discounts,
+            price_after_discounts: cart.price_after_discounts,
+            currency: Currency::from_str(&cart.currency)?,
+        };
+        Ok(cart)
     }
 }
