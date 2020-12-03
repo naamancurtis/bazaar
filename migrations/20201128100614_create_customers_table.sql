@@ -16,10 +16,10 @@ CREATE OR REPLACE FUNCTION update_last_modified_column() RETURNS TRIGGER
 BEGIN
     NEW.last_modified = NOW();
     RETURN NEW; 
-END;    
+END;
 $$;
 
-CREATE TRIGGER trigger_last_modified
+CREATE TRIGGER trigger_last_modified_customers
   BEFORE UPDATE ON customers
   FOR EACH ROW
   EXECUTE PROCEDURE update_last_modified_column();

@@ -264,6 +264,7 @@ async fn update_customer_mutation_works() -> Result<(), Box<dyn std::error::Erro
     assert_eq!(customer.email, format!("{}@test.com", "updated"));
     assert_eq!(customer.first_name, "updated".to_string());
     assert_eq!(customer.last_name, "updated".to_string());
+    assert!(customer.last_modified > customer.created_at);
     Ok(())
 }
 use sqlx::{Connection, Executor, PgConnection, PgPool};

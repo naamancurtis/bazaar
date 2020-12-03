@@ -150,6 +150,13 @@ impl Customer {
 
     async fn cart(&self, ctx: &Context<'_>) -> Option<ShoppingCart> {
         let pool = ctx.data::<PgPool>().ok()?;
-        todo!()
+        if let Some(cart_id) = self.cart_id {
+            return match ShoppingCart::find_by_id(cart_id, pool).await {
+                Ok(Some(cart)) => Some(cart),
+                Ok(None) => None,
+                Err(_) => None,
+            };
+        }
+        None
     }
 }

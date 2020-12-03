@@ -25,18 +25,16 @@ The input/output is a string in RFC3339 format.
 scalar DateTime
 type ShoppingCart {
 	id: UUID!
-	items: [CartItem!]!
+	cartType: CartType!
+	items: [String!]!
 	priceBeforeDiscounts: Float!
-	discountsApplied: [Float!]!
+	discounts: [UUID!]
 	priceAfterDiscounts: Float!
 	currency: Currency!
 }
-type CartItem {
-	sku: String!
-	quantity: Int!
-	pricePerUnit: Float!
-	name: String!
-	description: String!
+enum CartType {
+	ANONYMOUS
+	KNOWN
 }
 enum Currency {
 	GBP

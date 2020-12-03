@@ -41,6 +41,7 @@ config = { version = "0.10.1", default-features = false, features = ["yaml"] }
 graphql_client = "0.9.0"
 tracing-actix-web = "0.2.1"
 serde-aux = "1.1.0"
+strum = { version = "0.20.0", features = ["derive"] } 
 
 [dev-dependencies]
 reqwest = { version = "0.10.9", features = ["json", "trust-dns"] } 

@@ -230,6 +230,62 @@
       ]
     }
   },
+  "d8353a0799fb754e7c36f5f83c2bc16e7e37b17c76ab8ed759a68d6c5e646a76": {
+    "query": "\n                SELECT \n                id, \n                items, \n                cart_type, \n                price_before_discounts, \n                price_after_discounts,\n                discounts,\n                currency\n                FROM shopping_carts WHERE id = $1\n                ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "items",
+          "type_info": "VarcharArray"
+        },
+        {
+          "ordinal": 2,
+          "name": "cart_type",
+          "type_info": "Int2"
+        },
+        {
+          "ordinal": 3,
+          "name": "price_before_discounts",
+          "type_info": "Float8"
+        },
+        {
+          "ordinal": 4,
+          "name": "price_after_discounts",
+          "type_info": "Float8"
+        },
+        {
+          "ordinal": 5,
+          "name": "discounts",
+          "type_info": "UuidArray"
+        },
+        {
+          "ordinal": 6,
+          "name": "currency",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        true,
+        false,
+        false,
+        false,
+        true,
+        false
+      ]
+    }
+  },
   "df9e536fb1cf4fd51fc4a712e41a6e737110973f80c5541735e43b6a5a0c4c72": {
     "query": "\n            SELECT * FROM customers\n            ",
     "describe": {
