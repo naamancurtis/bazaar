@@ -1,7 +1,7 @@
 {
   "db": "PostgreSQL",
-  "1ab99ac52adc46e96b069f84c21cd356d59f8b872037ee178433b7da14f6e6d8": {
-    "query": "SELECT * FROM customers",
+  "237a6d14341ea9db48aa647d1c9501db46cbbe05223b6086950ca1aa78de5e2e": {
+    "query": "\n            INSERT INTO customers ( id, email, first_name, last_name )\n            VALUES ( $1, $2, $3, $4 )\n            RETURNING *;\n            ",
     "describe": {
       "columns": [
         {
@@ -28,48 +28,16 @@
           "ordinal": 4,
           "name": "created_at",
           "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": []
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "2c9e5c4fb16898fc72082b6ee51ae18687e35e420175d2f96e5504f536a4ba85": {
-    "query": "\n        INSERT INTO customers ( id, email, first_name, last_name, created_at )\n        VALUES ( $1, $2, $3, $4, $5 )\n        RETURNING *;\n        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Uuid"
         },
         {
-          "ordinal": 1,
-          "name": "email",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "first_name",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "last_name",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 4,
-          "name": "created_at",
+          "ordinal": 5,
+          "name": "last_modified",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "cart_id",
+          "type_info": "Uuid"
         }
       ],
       "parameters": {
@@ -77,8 +45,7 @@
           "Uuid",
           "Text",
           "Text",
-          "Text",
-          "Timestamptz"
+          "Text"
         ]
       },
       "nullable": [
@@ -86,12 +53,14 @@
         false,
         false,
         false,
-        false
+        false,
+        false,
+        true
       ]
     }
   },
-  "7af29c0b01b12cbed99479856b32196dc1119cd2c7bcd9499471f0be686b21b8": {
-    "query": "SELECT * FROM customers WHERE id = $1",
+  "52c254bfa828472a448ba23bc2eafe77c4337ce645cc61443b997eeb4f7fc74f": {
+    "query": "\n            SELECT * FROM customers WHERE id = $1\n            ",
     "describe": {
       "columns": [
         {
@@ -118,6 +87,16 @@
           "ordinal": 4,
           "name": "created_at",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "last_modified",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "cart_id",
+          "type_info": "Uuid"
         }
       ],
       "parameters": {
@@ -130,12 +109,14 @@
         false,
         false,
         false,
-        false
+        false,
+        false,
+        true
       ]
     }
   },
-  "91348d5c99ab77c9b5c172d19ee16f7e7d2dc4fdff0bda64e2aed1b4249336cc": {
-    "query": "\n        UPDATE customers\n        SET email = $1, first_name = $2, last_name = $3\n        WHERE id = $4\n        RETURNING *;\n            ",
+  "72e26076d306addf3b1180ffb5b426f3a3aad18c5a8b0168c0ee6bec8ad57eca": {
+    "query": "\n            SELECT * FROM customers WHERE email = $1;\n            ",
     "describe": {
       "columns": [
         {
@@ -162,53 +143,16 @@
           "ordinal": 4,
           "name": "created_at",
           "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text",
-          "Text",
-          "Text",
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "d06aaacbdbb88134c920fa084923ab7cbf1096b4b033d4823cebe3a4b67a6da3": {
-    "query": "\n        SELECT * FROM customers WHERE email = $1;\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Uuid"
         },
         {
-          "ordinal": 1,
-          "name": "email",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "first_name",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "last_name",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 4,
-          "name": "created_at",
+          "ordinal": 5,
+          "name": "last_modified",
           "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "cart_id",
+          "type_info": "Uuid"
         }
       ],
       "parameters": {
@@ -221,7 +165,122 @@
         false,
         false,
         false,
-        false
+        false,
+        false,
+        true
+      ]
+    }
+  },
+  "ba487bad58a085b0c95ed3cb98e1c4b7558309367b3478f689c38cf1a1fa08a1": {
+    "query": "\n            UPDATE customers\n            SET email = $1, first_name = $2, last_name = $3\n            WHERE id = $4\n            RETURNING *;\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "email",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "first_name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "last_name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 4,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "last_modified",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "cart_id",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text",
+          "Text",
+          "Text",
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
+      ]
+    }
+  },
+  "df9e536fb1cf4fd51fc4a712e41a6e737110973f80c5541735e43b6a5a0c4c72": {
+    "query": "\n            SELECT * FROM customers\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "email",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 2,
+          "name": "first_name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 3,
+          "name": "last_name",
+          "type_info": "Text"
+        },
+        {
+          "ordinal": 4,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 5,
+          "name": "last_modified",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 6,
+          "name": "cart_id",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": []
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false,
+        true
       ]
     }
   }

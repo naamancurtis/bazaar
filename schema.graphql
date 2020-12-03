@@ -3,12 +3,18 @@ type QueryRoot {
 	customerById(id: UUID!): Customer
 	customerByEmail(email: String!): Customer
 }
+"""
+Graphql Resolver
+"""
 type Customer {
 	id: UUID!
 	email: String!
 	firstName: String!
 	lastName: String!
 	createdAt: DateTime!
+	lastModified: DateTime!
+	cartId: UUID
+	cart: ShoppingCart
 }
 scalar UUID
 """
@@ -17,6 +23,25 @@ Implement the DateTime<Utc> scalar
 The input/output is a string in RFC3339 format.
 """
 scalar DateTime
+type ShoppingCart {
+	id: UUID!
+	items: [CartItem!]!
+	priceBeforeDiscounts: Float!
+	discountsApplied: [Float!]!
+	priceAfterDiscounts: Float!
+	currency: Currency!
+}
+type CartItem {
+	sku: String!
+	quantity: Int!
+	pricePerUnit: Float!
+	name: String!
+	description: String!
+}
+enum Currency {
+	GBP
+	USD
+}
 type MutationRoot {
 	createCustomer(email: String!, firstName: String!, lastName: String!): Customer!
 	updateCustomer(id: UUID!, update: CustomerUpdate!): Customer!

@@ -11,6 +11,15 @@ use bazaar::{
     telemetry::{generate_subscriber, init_subscriber},
 };
 
+const CUSTOMER_GRAPHQL_FIELDS: &str = "#
+id,
+firstName,
+lastName,
+email,
+createdAt,
+lastModified
+#";
+
 lazy_static! {
     /// To ensure logs are only outputted in tests when requred, by default
     /// tests run with no logs being captured
@@ -49,17 +58,16 @@ async fn create_customer_mutation_works() -> Result<(), Box<dyn std::error::Erro
     let app = spawn_app().await;
     let client = reqwest::Client::new();
 
-    let graphql_mutatation = r#"
-        mutation createCustomer($email: String!, $firstName: String!, $lastName: String!) {
-            createCustomer(email: $email, firstName: $firstName, lastName: $lastName) {
-                id,
-                firstName,
-                lastName,
-                email,
-                createdAt
-            }
-        }
-    "#;
+    let graphql_mutatation = format!(
+        r#"
+        mutation createCustomer($email: String!, $firstName: String!, $lastName: String!) {{
+            createCustomer(email: $email, firstName: $firstName, lastName: $lastName) {{
+                {}
+            }}
+        }}
+    "#,
+        CUSTOMER_GRAPHQL_FIELDS
+    );
 
     let email = format!("{}@test.com", Uuid::new_v4());
     let first_name = Uuid::new_v4();
@@ -105,17 +113,16 @@ async fn query_customer_by_id_mutation_works() -> Result<(), Box<dyn std::error:
         .await
         .expect("default customer failed to be created");
 
-    let graphql_mutatation = r#"
-        query customerById($id: UUID!) {
-            customerById(id: $id) {
-                id,
-                firstName,
-                lastName,
-                email,
-                createdAt
-            }
-        }
-    "#;
+    let graphql_mutatation = format!(
+        r#"
+        query customerById($id: UUID!) {{
+            customerById(id: $id) {{
+                {}
+            }}
+        }}
+    "#,
+        CUSTOMER_GRAPHQL_FIELDS
+    );
 
     let body = json!({
         "query": graphql_mutatation,
@@ -159,17 +166,16 @@ async fn query_customer_by_email_mutation_works() -> Result<(), Box<dyn std::err
         .await
         .expect("default customer failed to be created");
 
-    let graphql_mutatation = r#"
-        query customerByEmail($email: String!) {
-            customerByEmail(email: $email) {
-                id,
-                firstName,
-                lastName,
-                email,
-                createdAt
-            }
-        }
-    "#;
+    let graphql_mutatation = format!(
+        r#"
+        query customerByEmail($email: String!) {{
+            customerByEmail(email: $email) {{
+                {}
+            }}
+        }}
+    "#,
+        CUSTOMER_GRAPHQL_FIELDS
+    );
 
     let body = json!({
         "query": graphql_mutatation,
@@ -214,17 +220,16 @@ async fn update_customer_mutation_works() -> Result<(), Box<dyn std::error::Erro
         .await
         .expect("default customer failed to be created");
 
-    let graphql_mutatation = r#"
-        mutation updateCustomer($id: UUID!, $update: CustomerUpdate) {
-            updateCustomer(id: $id, update: $update) {
-                id,
-                firstName,
-                lastName,
-                email,
-                createdAt
-            }
-        }
-    "#;
+    let graphql_mutatation = format!(
+        r#"
+        mutation updateCustomer($id: UUID!, $update: CustomerUpdate) {{
+            updateCustomer(id: $id, update: $update) {{
+                {}
+            }}
+        }}
+    "#,
+        CUSTOMER_GRAPHQL_FIELDS
+    );
 
     let body = json!({
         "query": graphql_mutatation,
@@ -315,9 +320,9 @@ pub async fn insert_default_customer(pool: &PgPool) -> Result<Uuid, Box<dyn std:
     let first_name = Uuid::nil().to_string();
     let last_name = Uuid::nil().to_string();
 
-    let customer = Customer::new(email, first_name, last_name, pool)
-        .await
-        .expect("failed to insert default customer");
+    let customer = Customer::new(email, first_name, last_name, pool).await;
+    dbg!(&customer);
+    let customer = customer.expect("failed to insert default customer");
     Ok(customer.id)
 }
 
