@@ -199,10 +199,6 @@ impl Customer {
         self.last_modified
     }
 
-    async fn cart_id(&self) -> Option<Uuid> {
-        self.cart_id
-    }
-
     async fn cart(&self, ctx: &Context<'_>) -> Option<ShoppingCart> {
         let pool = ctx.data::<PgPool>().ok()?;
         if let Some(cart_id) = self.cart_id {

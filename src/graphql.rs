@@ -61,6 +61,8 @@ pub struct MutationRoot;
 
 #[Object]
 impl MutationRoot {
+    // @TODO - Once there's an auth token, we need to ensure that if the user has an
+    // anonymous cart, it's correctly added when they're signing up
     #[tracing::instrument(name = "create_customer", skip(self, ctx))]
     async fn create_customer(
         &self,

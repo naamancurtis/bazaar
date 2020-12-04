@@ -1,116 +1,67 @@
-use async_graphql::{Result, SimpleObject};
+use async_graphql::{Object, Result};
+use chrono::{DateTime, Utc};
 use serde::Deserialize;
-use sqlx::{query, PgPool};
-use std::hash::{Hash, Hasher};
-use std::str::FromStr;
+use sqlx::{query, query_as, PgPool, Type};
 use uuid::Uuid;
 
-#[derive(
-    Debug,
-    async_graphql::Enum,
-    Copy,
-    Clone,
-    Eq,
-    PartialEq,
-    Deserialize,
-    strum::EnumString,
-    strum::ToString,
-)]
-pub enum Currency {
-    GBP,
-    USD,
-}
+use crate::models::{CartItem, Currency};
 
-#[derive(Debug, async_graphql::Enum, Copy, Clone, Eq, PartialEq, Deserialize)]
+#[derive(Debug, async_graphql::Enum, Copy, Clone, Eq, PartialEq, Deserialize, sqlx::Type)]
+#[sqlx(rename = "user_cart_type", rename_all = "UPPERCASE")]
 #[serde(rename_all(deserialize = "SCREAMING_SNAKE_CASE"))]
 pub enum CartType {
     Anonymous,
     Known,
 }
 
-impl From<i16> for CartType {
-    fn from(num: i16) -> Self {
-        match num {
-            0 => Self::Anonymous,
-            1 => Self::Known,
-            _ => panic!("invalid cart type"),
-        }
-    }
-}
-
-// @TODO - Add in discounts struct
-// pub struct Discount {
-//     id: Uuid,
-//     category: DiscountCategory,
-//     description:
-// }
-
-#[derive(Debug, SimpleObject, Deserialize)]
-pub struct CartItem {
-    pub sku: String,
-    pub quantity: u32,
-    pub price_per_unit: f64,
-    pub name: String,
-    pub description: String,
-}
-
-impl Hash for CartItem {
-    fn hash<H: Hasher>(&self, state: &mut H) {
-        self.sku.hash(state);
-    }
-}
-
-impl PartialEq for CartItem {
-    fn eq(&self, other: &Self) -> bool {
-        self.sku == other.sku
-    }
-}
-
-impl Eq for CartItem {}
-
-#[derive(Debug, SimpleObject, Deserialize)]
+#[derive(Debug, Deserialize, sqlx::FromRow)]
 #[serde(rename_all(serialize = "snake_case", deserialize = "camelCase"))]
 pub struct ShoppingCart {
     pub id: Uuid,
     pub cart_type: CartType,
-    pub items: Vec<String>,
+    pub items: Vec<InternalCartItem>,
+    pub discounts: Option<Vec<Uuid>>,
     pub price_before_discounts: f64,
-    pub discounts: Option<Vec<Uuid>>, // See @TODO above
     pub price_after_discounts: f64,
     pub currency: Currency,
+    pub created_at: DateTime<Utc>,
+    pub last_modified: DateTime<Utc>,
+}
+
+struct SqlxShoppingCart {
+    pub id: Uuid,
+    pub cart_type: CartType,
+    pub items: Vec<(String, i32)>,
+    pub discounts: Option<Vec<Uuid>>,
+    pub price_before_discounts: f64,
+    pub price_after_discounts: f64,
+    pub currency: Currency,
+    pub created_at: DateTime<Utc>,
+    pub last_modified: DateTime<Utc>,
 }
 
 impl ShoppingCart {
     #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
     pub async fn find_by_id(id: Uuid, pool: &PgPool) -> Result<Option<Self>> {
-        let cart = query!(
+        let cart = query_as!(
+            SqlxShoppingCart,
             r#"
-                SELECT 
+            SELECT
                 id, 
-                items, 
-                cart_type, 
-                price_before_discounts, 
-                price_after_discounts,
-                discounts,
-                currency
-                FROM shopping_carts WHERE id = $1
-                "#,
+                cart_type as "cart_type!: CartType", 
+                items as "items!: Vec<(String, i32)>",
+                currency as "currency!: Currency",
+                discounts, price_before_discounts, price_after_discounts,
+                created_at, last_modified
+            FROM shopping_carts WHERE id = $1
+            "#,
             id
         )
-        .fetch_one(pool)
-        .await?;
+        .fetch_optional(pool)
+        .await?
+        .map(|cart| cart.into());
 
-        let cart = Self {
-            id: cart.id,
-            items: cart.items.unwrap_or_else(Vec::default),
-            cart_type: CartType::from(cart.cart_type),
-            price_before_discounts: cart.price_before_discounts,
-            discounts: cart.discounts,
-            price_after_discounts: cart.price_after_discounts,
-            currency: Currency::from_str(&cart.currency)?,
-        };
-
-        Ok(Some(cart))
+        Ok(cart)
     }
 
     #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
@@ -128,35 +79,116 @@ impl ShoppingCart {
 impl ShoppingCart {
     #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
     async fn new(id: Uuid, cart_type: CartType, currency: Currency, pool: &PgPool) -> Result<Self> {
-        let cart = query!(
+        let cart = query_as!(
+            SqlxShoppingCart,
             r#"
             INSERT INTO shopping_carts (id, cart_type, currency)
             VALUES ( $1, $2, $3 )
             RETURNING
                 id, 
-                items, 
-                cart_type, 
-                price_before_discounts, 
-                price_after_discounts,
-                discounts,
-                currency;
+                cart_type as "cart_type!: CartType", 
+                items as "items!: Vec<(String, i32)>",
+                currency as "currency!: Currency",
+                discounts, price_before_discounts, price_after_discounts,
+                created_at, last_modified
             "#,
             id,
-            cart_type as i16,
-            currency.to_string()
+            cart_type as CartType,
+            currency as Currency
         )
         .fetch_one(pool)
         .await?;
 
-        let cart = Self {
+        Ok(cart.into())
+    }
+}
+
+impl From<SqlxShoppingCart> for ShoppingCart {
+    fn from(cart: SqlxShoppingCart) -> Self {
+        Self {
             id: cart.id,
-            items: cart.items.unwrap_or_else(Vec::default),
-            cart_type: CartType::from(cart.cart_type),
+            items: cart.items.into_iter().map(|v| v.into()).collect(),
+            cart_type: cart.cart_type,
             price_before_discounts: cart.price_before_discounts,
             discounts: cart.discounts,
             price_after_discounts: cart.price_after_discounts,
-            currency: Currency::from_str(&cart.currency)?,
-        };
-        Ok(cart)
+            currency: cart.currency,
+            created_at: cart.created_at,
+            last_modified: cart.last_modified,
+        }
+    }
+}
+
+#[derive(Debug, Deserialize, sqlx::Type)]
+#[sqlx(rename = "internal_cart_item")]
+pub struct InternalCartItem {
+    pub sku: String,
+    pub quantity: i32,
+}
+
+impl PartialEq for InternalCartItem {
+    fn eq(&self, other: &Self) -> bool {
+        self.sku == other.sku
+    }
+}
+
+impl Eq for InternalCartItem {}
+
+impl From<(String, i32)> for InternalCartItem {
+    fn from((sku, quantity): (String, i32)) -> Self {
+        Self { sku, quantity }
+    }
+}
+
+impl std::ops::Add for InternalCartItem {
+    type Output = Self;
+
+    fn add(self, other: Self) -> Self {
+        Self {
+            sku: self.sku,
+            quantity: self.quantity + other.quantity,
+        }
+    }
+}
+
+impl std::ops::Sub for InternalCartItem {
+    type Output = Self;
+
+    fn sub(self, other: Self) -> Self {
+        Self {
+            sku: self.sku,
+            quantity: self.quantity - other.quantity,
+        }
+    }
+}
+
+#[Object]
+impl ShoppingCart {
+    async fn id(&self) -> Uuid {
+        self.id
+    }
+
+    async fn cart_type(&self) -> CartType {
+        self.cart_type
+    }
+
+    async fn discounts(&self) -> Option<Vec<Uuid>> {
+        None
+    }
+
+    async fn price_before_discounts(&self) -> f64 {
+        self.price_before_discounts
+    }
+
+    async fn price_after_discounts(&self) -> f64 {
+        self.price_after_discounts
+    }
+
+    async fn currency(&self) -> Currency {
+        self.currency
+    }
+
+    async fn last_modified(&self) -> DateTime<Utc> {
+        self.last_modified
     }
 }

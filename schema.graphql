@@ -13,7 +13,6 @@ type Customer {
 	lastName: String!
 	createdAt: DateTime!
 	lastModified: DateTime!
-	cartId: UUID
 	cart: ShoppingCart
 }
 scalar UUID
@@ -26,11 +25,11 @@ scalar DateTime
 type ShoppingCart {
 	id: UUID!
 	cartType: CartType!
-	items: [String!]!
-	priceBeforeDiscounts: Float!
 	discounts: [UUID!]
+	priceBeforeDiscounts: Float!
 	priceAfterDiscounts: Float!
 	currency: Currency!
+	lastModified: DateTime!
 }
 enum CartType {
 	ANONYMOUS
