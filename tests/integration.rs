@@ -1,3 +1,5 @@
+#![feature(try_trait)]
+use anyhow::Result;
 use lazy_static::lazy_static;
 use serde::{Deserialize, Serialize};
 use serde_json::json;
@@ -7,7 +9,7 @@ use uuid::Uuid;
 
 use bazaar::{
     configuration::DatabaseSettings,
-    models::Customer,
+    models::{shopping_cart::CartType, Currency, Customer, ShoppingCart},
     telemetry::{generate_subscriber, init_subscriber},
 };
 
@@ -18,6 +20,16 @@ lastName,
 email,
 createdAt,
 lastModified
+#";
+
+const SHOPPING_CART_GRAPHQL_FIELDS: &str = "#
+id,
+cartType,
+items,
+priceBeforeDiscounts,
+discounts,
+priceAfterDiscounts,
+currency
 #";
 
 lazy_static! {
@@ -54,7 +66,7 @@ async fn health_check_works() {
 }
 
 #[actix_rt::test]
-async fn create_customer_mutation_works() -> Result<(), Box<dyn std::error::Error>> {
+async fn mutation_create_customer_works() -> Result<()> {
     let app = spawn_app().await;
     let client = reqwest::Client::new();
 
@@ -86,8 +98,8 @@ async fn create_customer_mutation_works() -> Result<(), Box<dyn std::error::Erro
     let response = client.post(&app.address).json(&body).send().await?;
 
     #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
     struct CreateCustomerResponse {
-        #[serde(rename = "createCustomer")]
         create_customer: Customer,
     }
 
@@ -105,13 +117,14 @@ async fn create_customer_mutation_works() -> Result<(), Box<dyn std::error::Erro
 }
 
 #[actix_rt::test]
-async fn query_customer_by_id_mutation_works() -> Result<(), Box<dyn std::error::Error>> {
+async fn query_customer_by_id_works() -> Result<()> {
     let app = spawn_app().await;
     let client = reqwest::Client::new();
 
     let customer_id = insert_default_customer(&app.db_pool)
-        .await
-        .expect("default customer failed to be created");
+        .await?
+        .customer
+        .unwrap();
 
     let graphql_mutatation = format!(
         r#"
@@ -136,8 +149,8 @@ async fn query_customer_by_id_mutation_works() -> Result<(), Box<dyn std::error:
     let response = client.post(&app.address).json(&body).send().await?;
 
     #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
     struct CustomerQueryResponse {
-        #[serde(rename = "customerById")]
         customer_by_id: Option<Customer>,
     }
 
@@ -158,7 +171,7 @@ async fn query_customer_by_id_mutation_works() -> Result<(), Box<dyn std::error:
 }
 
 #[actix_rt::test]
-async fn query_customer_by_email_mutation_works() -> Result<(), Box<dyn std::error::Error>> {
+async fn query_customer_by_email_works() -> Result<(), Box<dyn std::error::Error>> {
     let app = spawn_app().await;
     let client = reqwest::Client::new();
 
@@ -189,8 +202,8 @@ async fn query_customer_by_email_mutation_works() -> Result<(), Box<dyn std::err
     let response = client.post(&app.address).json(&body).send().await?;
 
     #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
     struct CustomerQueryResponse {
-        #[serde(rename = "customerByEmail")]
         customer_by_email: Option<Customer>,
     }
 
@@ -212,13 +225,14 @@ async fn query_customer_by_email_mutation_works() -> Result<(), Box<dyn std::err
 }
 
 #[actix_rt::test]
-async fn update_customer_mutation_works() -> Result<(), Box<dyn std::error::Error>> {
+async fn mutation_update_customer_works() -> Result<()> {
     let app = spawn_app().await;
     let client = reqwest::Client::new();
 
     let customer_id = insert_default_customer(&app.db_pool)
-        .await
-        .expect("default customer failed to be created");
+        .await?
+        .customer
+        .unwrap();
 
     let graphql_mutatation = format!(
         r#"
@@ -248,8 +262,8 @@ async fn update_customer_mutation_works() -> Result<(), Box<dyn std::error::Erro
     let response = client.post(&app.address).json(&body).send().await?;
 
     #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
     struct CustomerUpdateResponse {
-        #[serde(rename = "updateCustomer")]
         update_customer: Customer,
     }
 
@@ -267,12 +281,201 @@ async fn update_customer_mutation_works() -> Result<(), Box<dyn std::error::Erro
     assert!(customer.last_modified > customer.created_at);
     Ok(())
 }
+
+#[actix_rt::test]
+async fn mutation_create_anonymous_cart_works() -> Result<()> {
+    let app = spawn_app().await;
+    let client = reqwest::Client::new();
+
+    let graphql_mutatation = format!(
+        r#"
+        mutation createAnonymousCart($currency: Currency!) {{
+            createAnonymousCart(currency: $currency) {{
+                {}
+            }}
+        }}
+    "#,
+        SHOPPING_CART_GRAPHQL_FIELDS
+    );
+
+    let body = json!({
+        "query": graphql_mutatation,
+        "variables": {
+            "currency": "GBP",
+        }
+    });
+
+    dbg!(&body);
+
+    let response = client.post(&app.address).json(&body).send().await?;
+
+    dbg!(&response);
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct AnonymousCartResponse {
+        create_anonymous_cart: Option<ShoppingCart>,
+    }
+
+    let response = response.json::<Response<AnonymousCartResponse>>().await?;
+    dbg!(&response);
+
+    let cart = response
+        .data
+        .expect("successful response should contain data")
+        .create_anonymous_cart;
+    assert!(cart.is_some());
+    let cart = cart.unwrap();
+
+    // By Rusts strong type system, all the other necessary fields by default must be
+    // present
+    assert_eq!(cart.currency, Currency::GBP);
+    assert_eq!(cart.cart_type, CartType::Anonymous);
+    Ok(())
+}
+
+#[actix_rt::test]
+async fn mutation_create_known_cart_works() -> Result<()> {
+    let app = spawn_app().await;
+    let client = reqwest::Client::new();
+
+    let customer = insert_default_customer(&app.db_pool)
+        .await?
+        .customer
+        .unwrap();
+
+    let graphql_mutatation = format!(
+        r#"
+        mutation createKnownCart($id: UUID!, $currency: Currency!) {{
+            createKnownCart(id: $id, currency: $currency) {{
+                {}
+            }}
+        }}
+    "#,
+        SHOPPING_CART_GRAPHQL_FIELDS
+    );
+
+    let body = json!({
+        "query": graphql_mutatation,
+        "variables": {
+            "currency": "GBP",
+            "id": customer
+        }
+    });
+
+    dbg!(&body);
+
+    let response = client.post(&app.address).json(&body).send().await?;
+
+    dbg!(&response);
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct KnownCartResponse {
+        create_known_cart: Option<ShoppingCart>,
+    }
+
+    let response = response.json::<Response<KnownCartResponse>>().await?;
+    dbg!(&response);
+
+    let cart = response
+        .data
+        .expect("successful response should contain data")
+        .create_known_cart;
+    assert!(cart.is_some());
+    let cart = cart.unwrap();
+
+    // By Rusts strong type system, all the other necessary fields by default must be
+    // present
+    assert_eq!(cart.currency, Currency::GBP);
+    assert_eq!(cart.cart_type, CartType::Known);
+
+    let customer = Customer::find_by_id(customer, &app.db_pool)
+        .await
+        .expect("failed to query customer from the database")
+        .expect("failed to find customer");
+    assert_eq!(
+        customer.cart_id.expect("customer should have cart id"),
+        cart.id
+    );
+    Ok(())
+}
+
+#[actix_rt::test]
+async fn mutation_create_known_cart_doesnt_recreate_existing_cart() -> Result<()> {
+    let app = spawn_app().await;
+    let client = reqwest::Client::new();
+
+    let ids = insert_default_customer_with_cart(&app.db_pool).await?;
+
+    let graphql_mutatation = format!(
+        r#"
+        mutation createKnownCart($id: UUID!, $currency: Currency!) {{
+            createKnownCart(id: $id, currency: $currency) {{
+                {}
+            }}
+        }}
+    "#,
+        SHOPPING_CART_GRAPHQL_FIELDS
+    );
+
+    let body = json!({
+        "query": graphql_mutatation,
+        "variables": {
+            "currency": "GBP",
+            "id": ids.customer.unwrap()
+        }
+    });
+
+    dbg!(&body);
+
+    let response = client.post(&app.address).json(&body).send().await?;
+
+    dbg!(&response);
+
+    #[derive(Debug, Deserialize)]
+    #[serde(rename_all = "camelCase")]
+    struct KnownCartResponse {
+        create_known_cart: Option<ShoppingCart>,
+    }
+
+    let response = response.json::<Response<KnownCartResponse>>().await?;
+    dbg!(&response);
+
+    let cart = response
+        .data
+        .expect("successful response should contain data")
+        .create_known_cart;
+    assert!(cart.is_some());
+    let cart = cart.unwrap();
+
+    assert_eq!(cart.id, ids.cart.unwrap());
+    assert_eq!(cart.currency, Currency::GBP);
+    assert_eq!(cart.cart_type, CartType::Known);
+
+    let customer = Customer::find_by_id(ids.customer.unwrap(), &app.db_pool)
+        .await
+        .expect("failed to query customer from the database")
+        .expect("failed to find customer");
+
+    assert_eq!(
+        customer.cart_id.expect("customer should have cart id"),
+        cart.id
+    );
+    Ok(())
+}
+
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use std::net::TcpListener;
 
 pub struct TestApp {
     pub address: String,
     pub db_pool: PgPool,
+}
+
+pub struct IdHolder {
+    customer: Option<Uuid>,
+    cart: Option<Uuid>,
 }
 
 pub async fn spawn_app() -> TestApp {
@@ -316,7 +519,7 @@ pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
     pool
 }
 
-pub async fn insert_default_customer(pool: &PgPool) -> Result<Uuid, Box<dyn std::error::Error>> {
+pub async fn insert_default_customer(pool: &PgPool) -> Result<IdHolder> {
     let email = format!("{}@test.com", Uuid::nil());
     let first_name = Uuid::nil().to_string();
     let last_name = Uuid::nil().to_string();
@@ -324,7 +527,29 @@ pub async fn insert_default_customer(pool: &PgPool) -> Result<Uuid, Box<dyn std:
     let customer = Customer::new(email, first_name, last_name, pool).await;
     dbg!(&customer);
     let customer = customer.expect("failed to insert default customer");
-    Ok(customer.id)
+    Ok(IdHolder {
+        customer: Some(customer.id),
+        cart: None,
+    })
+}
+
+pub async fn insert_default_customer_with_cart(pool: &PgPool) -> Result<IdHolder> {
+    let email = format!("{}@test.com", Uuid::nil());
+    let first_name = Uuid::nil().to_string();
+    let last_name = Uuid::nil().to_string();
+
+    let customer = Customer::new(email, first_name, last_name, pool)
+        .await
+        .expect("failed to insert default customer");
+    dbg!(&customer);
+    let cart = Customer::add_new_cart(customer.id, Currency::GBP, pool)
+        .await
+        .expect("failed to attach cart to default customer");
+    dbg!(&cart);
+    Ok(IdHolder {
+        customer: Some(customer.id),
+        cart: Some(cart.id),
+    })
 }
 
 // Taken from https://github.com/graphql-rust/graphql-client

@@ -22,6 +22,7 @@ pub enum Currency {
 }
 
 #[derive(Debug, async_graphql::Enum, Copy, Clone, Eq, PartialEq, Deserialize)]
+#[serde(rename_all(deserialize = "SCREAMING_SNAKE_CASE"))]
 pub enum CartType {
     Anonymous,
     Known,
@@ -68,6 +69,7 @@ impl PartialEq for CartItem {
 impl Eq for CartItem {}
 
 #[derive(Debug, SimpleObject, Deserialize)]
+#[serde(rename_all(serialize = "snake_case", deserialize = "camelCase"))]
 pub struct ShoppingCart {
     pub id: Uuid,
     pub cart_type: CartType,
