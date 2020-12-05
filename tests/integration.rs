@@ -1,15 +1,13 @@
-#![feature(try_trait)]
 use anyhow::Result;
+use assert_json_diff::assert_json_include;
+use chrono::DateTime;
 use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
 use serde_json::json;
-use std::collections::HashMap;
-use std::fmt;
 use uuid::Uuid;
 
 use bazaar::{
     configuration::DatabaseSettings,
-    models::{shopping_cart::CartType, Currency, Customer, ShoppingCart},
+    models::{Currency, Customer},
     telemetry::{generate_subscriber, init_subscriber},
 };
 
@@ -23,13 +21,17 @@ lastModified
 #";
 
 const SHOPPING_CART_GRAPHQL_FIELDS: &str = "#
-id,
-cartType,
-items,
-priceBeforeDiscounts,
-discounts,
-priceAfterDiscounts,
+id
+cartType
+items {
+   sku 
+}
+priceBeforeDiscounts
+discounts
+priceAfterDiscounts
 currency
+lastModified
+createdAt
 #";
 
 lazy_static! {
@@ -46,6 +48,14 @@ lazy_static! {
         };
         let subscriber = generate_subscriber("test".to_string(), filter.into());
         init_subscriber(subscriber);
+    };
+
+    static ref DEFAULT_CUSTOMER: serde_json::Value = {
+        json!({
+            "email": format!("{}@test.com", Uuid::nil()),
+            "firstName": Uuid::nil(),
+            "lastName": Uuid::nil()
+        })
     };
 }
 
@@ -96,23 +106,16 @@ async fn mutation_create_customer_works() -> Result<()> {
     dbg!(&body);
 
     let response = client.post(&app.address).json(&body).send().await?;
+    let data = response.json::<serde_json::Value>().await?["data"]["createCustomer"].clone();
 
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct CreateCustomerResponse {
-        create_customer: Customer,
-    }
-
-    let response = response.json::<Response<CreateCustomerResponse>>().await?;
-
-    let customer = response
-        .data
-        .expect("successful response should contain data")
-        .create_customer;
-
-    assert_eq!(customer.email, email);
-    assert_eq!(customer.first_name, first_name.to_string());
-    assert_eq!(customer.last_name, last_name.to_string());
+    assert_json_include!(
+        actual: data,
+        expected: json!({
+            "email": email,
+            "firstName": first_name,
+            "lastName": last_name,
+        })
+    );
     Ok(())
 }
 
@@ -147,26 +150,8 @@ async fn query_customer_by_id_works() -> Result<()> {
     dbg!(&body);
 
     let response = client.post(&app.address).json(&body).send().await?;
-
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct CustomerQueryResponse {
-        customer_by_id: Option<Customer>,
-    }
-
-    let response = response.json::<Response<CustomerQueryResponse>>().await?;
-    dbg!(&response);
-
-    let customer = response
-        .data
-        .expect("successful response should contain data")
-        .customer_by_id;
-    assert!(customer.is_some());
-    let customer = customer.unwrap();
-
-    assert_eq!(customer.email, format!("{}@test.com", Uuid::nil()));
-    assert_eq!(customer.first_name, Uuid::nil().to_string());
-    assert_eq!(customer.last_name, Uuid::nil().to_string());
+    let data = response.json::<serde_json::Value>().await?["data"]["customerById"].clone();
+    assert_json_include!(actual: data, expected: DEFAULT_CUSTOMER.clone());
     Ok(())
 }
 
@@ -200,27 +185,8 @@ async fn query_customer_by_email_works() -> Result<(), Box<dyn std::error::Error
     dbg!(&body);
 
     let response = client.post(&app.address).json(&body).send().await?;
-
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct CustomerQueryResponse {
-        customer_by_email: Option<Customer>,
-    }
-
-    let response = response.json::<Response<CustomerQueryResponse>>().await?;
-    dbg!(&response);
-
-    let customer = response
-        .data
-        .expect("successful response should contain data")
-        .customer_by_email;
-
-    assert!(customer.is_some());
-    let customer = customer.unwrap();
-
-    assert_eq!(customer.email, format!("{}@test.com", Uuid::nil()));
-    assert_eq!(customer.first_name, Uuid::nil().to_string());
-    assert_eq!(customer.last_name, Uuid::nil().to_string());
+    let data = response.json::<serde_json::Value>().await?["data"]["customerByEmail"].clone();
+    assert_json_include!(actual: data, expected: DEFAULT_CUSTOMER.clone());
     Ok(())
 }
 
@@ -260,25 +226,24 @@ async fn mutation_update_customer_works() -> Result<()> {
     dbg!(&body);
 
     let response = client.post(&app.address).json(&body).send().await?;
+    let data = response.json::<serde_json::Value>().await?["data"]["updateCustomer"].clone();
+    dbg!(&data);
 
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct CustomerUpdateResponse {
-        update_customer: Customer,
-    }
+    assert_json_include!(
+        actual: &data,
+        expected: json!({
+            "firstName": "updated",
+            "lastName": "updated",
+            "email": "updated@test.com"
+        })
+    );
 
-    let response = response.json::<Response<CustomerUpdateResponse>>().await?;
-    dbg!(&response);
+    let last_modified = DateTime::parse_from_rfc3339(&data["lastModified"].as_str().unwrap())
+        .expect("date should parse correctly with rfc3339");
+    let created_at = DateTime::parse_from_rfc3339(&data["createdAt"].as_str().unwrap())
+        .expect("date should parse correctly with rfc3339");
 
-    let customer = response
-        .data
-        .expect("successful response should contain data")
-        .update_customer;
-
-    assert_eq!(customer.email, format!("{}@test.com", "updated"));
-    assert_eq!(customer.first_name, "updated".to_string());
-    assert_eq!(customer.last_name, "updated".to_string());
-    assert!(customer.last_modified > customer.created_at);
+    assert!(last_modified > created_at);
     Ok(())
 }
 
@@ -308,29 +273,16 @@ async fn mutation_create_anonymous_cart_works() -> Result<()> {
     dbg!(&body);
 
     let response = client.post(&app.address).json(&body).send().await?;
+    let data = response.json::<serde_json::Value>().await?["data"]["createAnonymousCart"].clone();
+    assert_json_include!(
+        actual: data,
+        expected: json!({
+            "currency": "GBP",
+            "cartType": "ANONYMOUS",
+            "items": []
+        })
+    );
 
-    dbg!(&response);
-
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct AnonymousCartResponse {
-        create_anonymous_cart: Option<ShoppingCart>,
-    }
-
-    let response = response.json::<Response<AnonymousCartResponse>>().await?;
-    dbg!(&response);
-
-    let cart = response
-        .data
-        .expect("successful response should contain data")
-        .create_anonymous_cart;
-    assert!(cart.is_some());
-    let cart = cart.unwrap();
-
-    // By Rusts strong type system, all the other necessary fields by default must be
-    // present
-    assert_eq!(cart.currency, Currency::GBP);
-    assert_eq!(cart.cart_type, CartType::Anonymous);
     Ok(())
 }
 
@@ -364,31 +316,17 @@ async fn mutation_create_known_cart_works() -> Result<()> {
     });
 
     dbg!(&body);
-
     let response = client.post(&app.address).json(&body).send().await?;
-
     dbg!(&response);
-
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct KnownCartResponse {
-        create_known_cart: Option<ShoppingCart>,
-    }
-
-    let response = response.json::<Response<KnownCartResponse>>().await?;
-    dbg!(&response);
-
-    let cart = response
-        .data
-        .expect("successful response should contain data")
-        .create_known_cart;
-    assert!(cart.is_some());
-    let cart = cart.unwrap();
-
-    // By Rusts strong type system, all the other necessary fields by default must be
-    // present
-    assert_eq!(cart.currency, Currency::GBP);
-    assert_eq!(cart.cart_type, CartType::Known);
+    let data = response.json::<serde_json::Value>().await?["data"]["createKnownCart"].clone();
+    assert_json_include!(
+        actual: &data,
+        expected: json!({
+            "currency": "GBP",
+            "cartType": "KNOWN",
+            "items": []
+        })
+    );
 
     let customer = Customer::find_by_id(customer, &app.db_pool)
         .await
@@ -396,7 +334,8 @@ async fn mutation_create_known_cart_works() -> Result<()> {
         .expect("failed to find customer");
     assert_eq!(
         customer.cart_id.expect("customer should have cart id"),
-        cart.id
+        Uuid::parse_str(&data["id"].as_str().expect("Cart should always have an ID"))
+            .expect("cart id should be valid UUID")
     );
     Ok(())
 }
@@ -432,26 +371,16 @@ async fn mutation_create_known_cart_doesnt_recreate_existing_cart() -> Result<()
     let response = client.post(&app.address).json(&body).send().await?;
 
     dbg!(&response);
-
-    #[derive(Debug, Deserialize)]
-    #[serde(rename_all = "camelCase")]
-    struct KnownCartResponse {
-        create_known_cart: Option<ShoppingCart>,
-    }
-
-    let response = response.json::<Response<KnownCartResponse>>().await?;
-    dbg!(&response);
-
-    let cart = response
-        .data
-        .expect("successful response should contain data")
-        .create_known_cart;
-    assert!(cart.is_some());
-    let cart = cart.unwrap();
-
-    assert_eq!(cart.id, ids.cart.unwrap());
-    assert_eq!(cart.currency, Currency::GBP);
-    assert_eq!(cart.cart_type, CartType::Known);
+    let data = response.json::<serde_json::Value>().await?["data"]["createKnownCart"].clone();
+    assert_json_include!(
+        actual: &data,
+        expected: json!({
+            "id": ids.cart,
+            "currency": "GBP",
+            "cartType": "KNOWN",
+            "items": []
+        })
+    );
 
     let customer = Customer::find_by_id(ids.customer.unwrap(), &app.db_pool)
         .await
@@ -460,7 +389,8 @@ async fn mutation_create_known_cart_doesnt_recreate_existing_cart() -> Result<()
 
     assert_eq!(
         customer.cart_id.expect("customer should have cart id"),
-        cart.id
+        Uuid::parse_str(&data["id"].as_str().expect("Cart should always have an ID"))
+            .expect("cart id should be valid UUID")
     );
     Ok(())
 }
@@ -550,82 +480,4 @@ pub async fn insert_default_customer_with_cart(pool: &PgPool) -> Result<IdHolder
         customer: Some(customer.id),
         cart: Some(cart.id),
     })
-}
-
-// Taken from https://github.com/graphql-rust/graphql-client
-
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct Response<Data> {
-    /// The absent, partial or complete response data.
-    pub data: Option<Data>,
-    /// The top-level errors returned by the server.
-    pub errors: Option<Vec<Error>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Error {
-    /// The human-readable error message. This is the only required field.
-    pub message: String,
-    /// Which locations in the query the error applies to.
-    pub locations: Option<Vec<Location>>,
-    /// Which path in the query the error applies to, e.g. `["users", 0, "email"]`.
-    pub path: Option<Vec<PathFragment>>,
-    /// Additional errors. Their exact format is defined by the server.
-    pub extensions: Option<HashMap<String, serde_json::Value>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-pub struct Location {
-    /// The line number in the query string where the error originated (starting from 1).
-    pub line: i32,
-    /// The column number in the query string where the error originated (starting from 1).
-    pub column: i32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(untagged)]
-pub enum PathFragment {
-    /// A key inside an object
-    Key(String),
-    /// An index inside an array
-    Index(i32),
-}
-
-impl fmt::Display for PathFragment {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            PathFragment::Key(ref key) => write!(f, "{}", key),
-            PathFragment::Index(ref idx) => write!(f, "{}", idx),
-        }
-    }
-}
-
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Use `/` as a separator like JSON Pointer.
-        let path = self
-            .path
-            .as_ref()
-            .map(|fragments| {
-                fragments
-                    .iter()
-                    .fold(String::new(), |mut acc, item| {
-                        acc.push_str(&format!("{}/", item));
-                        acc
-                    })
-                    .trim_end_matches('/')
-                    .to_string()
-            })
-            .unwrap_or_else(|| "<query>".to_string());
-
-        // Get the location of the error. We'll use just the first location for this.
-        let loc = self
-            .locations
-            .as_ref()
-            .and_then(|locations| locations.iter().next())
-            .cloned()
-            .unwrap_or_else(Location::default);
-
-        write!(f, "{}:{}:{}: {}", path, loc.line, loc.column, self.message)
-    }
 }

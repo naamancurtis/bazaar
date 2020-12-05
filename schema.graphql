@@ -29,7 +29,9 @@ type ShoppingCart {
 	priceBeforeDiscounts: Float!
 	priceAfterDiscounts: Float!
 	currency: Currency!
+	createdAt: DateTime!
 	lastModified: DateTime!
+	items: [CartItem!]!
 }
 enum CartType {
 	ANONYMOUS
@@ -38,6 +40,15 @@ enum CartType {
 enum Currency {
 	GBP
 	USD
+}
+type CartItem {
+	sku: String!
+	quantity: Int!
+	pricePerUnit: Float!
+	name: String!
+	description: String!
+	imageSrc: String!
+	tags: [String!]!
 }
 type MutationRoot {
 	createCustomer(email: String!, firstName: String!, lastName: String!): Customer!

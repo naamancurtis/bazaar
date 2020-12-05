@@ -188,7 +188,16 @@ impl ShoppingCart {
         self.currency
     }
 
+    async fn created_at(&self) -> DateTime<Utc> {
+        self.created_at
+    }
+
     async fn last_modified(&self) -> DateTime<Utc> {
         self.last_modified
+    }
+
+    // @TODO - Actually implement this
+    async fn items(&self) -> Vec<CartItem> {
+        Vec::new()
     }
 }
