@@ -1,5 +1,99 @@
 {
   "db": "PostgreSQL",
+  "1d340d11f64c533e206f926214948fc3cfec0692f691d5881e81be95bb2a309d": {
+    "query": "\n            SELECT\n                id, customer_id,\n                cart_type as \"cart_type!: CartType\", \n                items as \"items!: Json<Vec<InternalCartItem>>\",\n                currency as \"currency!: Currency\",\n                discounts, price_before_discounts, price_after_discounts,\n                created_at, last_modified\n            FROM shopping_carts WHERE id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "customer_id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "cart_type!: CartType",
+          "type_info": {
+            "Custom": {
+              "name": "user_cart_type",
+              "kind": {
+                "Enum": [
+                  "ANONYMOUS",
+                  "KNOWN"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 3,
+          "name": "items!: Json<Vec<InternalCartItem>>",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 4,
+          "name": "currency!: Currency",
+          "type_info": {
+            "Custom": {
+              "name": "currency_type",
+              "kind": {
+                "Enum": [
+                  "GBP",
+                  "USD"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 5,
+          "name": "discounts",
+          "type_info": "UuidArray"
+        },
+        {
+          "ordinal": 6,
+          "name": "price_before_discounts",
+          "type_info": "Float8"
+        },
+        {
+          "ordinal": 7,
+          "name": "price_after_discounts",
+          "type_info": "Float8"
+        },
+        {
+          "ordinal": 8,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 9,
+          "name": "last_modified",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        true,
+        false,
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "237a6d14341ea9db48aa647d1c9501db46cbbe05223b6086950ca1aa78de5e2e": {
     "query": "\n            INSERT INTO customers ( id, email, first_name, last_name )\n            VALUES ( $1, $2, $3, $4 )\n            RETURNING *;\n            ",
     "describe": {
@@ -59,6 +153,103 @@
       ]
     }
   },
+  "3cfcc6ae1e35b0f4b3c0410b8ee5a56e6a88de8eeb91e7d431f49e69341e1759": {
+    "query": "\n            UPDATE shopping_carts\n            SET price_before_discounts = $1, price_after_discounts = $2, items = $3::jsonb\n            WHERE id = $4\n            RETURNING \n                id, customer_id, \n                cart_type as \"cart_type!: CartType\", \n                items as \"items!: Json<Vec<InternalCartItem>>\",\n                currency as \"currency!: Currency\",\n                discounts, price_before_discounts, price_after_discounts,\n                created_at, last_modified\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "customer_id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "cart_type!: CartType",
+          "type_info": {
+            "Custom": {
+              "name": "user_cart_type",
+              "kind": {
+                "Enum": [
+                  "ANONYMOUS",
+                  "KNOWN"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 3,
+          "name": "items!: Json<Vec<InternalCartItem>>",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 4,
+          "name": "currency!: Currency",
+          "type_info": {
+            "Custom": {
+              "name": "currency_type",
+              "kind": {
+                "Enum": [
+                  "GBP",
+                  "USD"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 5,
+          "name": "discounts",
+          "type_info": "UuidArray"
+        },
+        {
+          "ordinal": 6,
+          "name": "price_before_discounts",
+          "type_info": "Float8"
+        },
+        {
+          "ordinal": 7,
+          "name": "price_after_discounts",
+          "type_info": "Float8"
+        },
+        {
+          "ordinal": 8,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 9,
+          "name": "last_modified",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Float8",
+          "Float8",
+          "Jsonb",
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        true,
+        false,
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "52c254bfa828472a448ba23bc2eafe77c4337ce645cc61443b997eeb4f7fc74f": {
     "query": "\n            SELECT * FROM customers WHERE id = $1\n            ",
     "describe": {
@@ -112,6 +303,150 @@
         false,
         false,
         true
+      ]
+    }
+  },
+  "669ec0fcffd6c612382111059e1ca39056c94f3b67d4ad902e9ce87083dec552": {
+    "query": "\n            SELECT\n                id, customer_id,\n                cart_type as \"cart_type!: CartType\", \n                items as \"items!: Json<Vec<InternalCartItem>>\",\n                currency as \"currency!: Currency\",\n                discounts, price_before_discounts, price_after_discounts,\n                created_at, last_modified\n            FROM shopping_carts WHERE customer_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "customer_id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "cart_type!: CartType",
+          "type_info": {
+            "Custom": {
+              "name": "user_cart_type",
+              "kind": {
+                "Enum": [
+                  "ANONYMOUS",
+                  "KNOWN"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 3,
+          "name": "items!: Json<Vec<InternalCartItem>>",
+          "type_info": "Jsonb"
+        },
+        {
+          "ordinal": 4,
+          "name": "currency!: Currency",
+          "type_info": {
+            "Custom": {
+              "name": "currency_type",
+              "kind": {
+                "Enum": [
+                  "GBP",
+                  "USD"
+                ]
+              }
+            }
+          }
+        },
+        {
+          "ordinal": 5,
+          "name": "discounts",
+          "type_info": "UuidArray"
+        },
+        {
+          "ordinal": 6,
+          "name": "price_before_discounts",
+          "type_info": "Float8"
+        },
+        {
+          "ordinal": 7,
+          "name": "price_after_discounts",
+          "type_info": "Float8"
+        },
+        {
+          "ordinal": 8,
+          "name": "created_at",
+          "type_info": "Timestamptz"
+        },
+        {
+          "ordinal": 9,
+          "name": "last_modified",
+          "type_info": "Timestamptz"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false,
+        true,
+        false,
+        true,
+        false,
+        true,
+        false,
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "7237643dc4f4f3585df320e9cf55abef51e376f2338b6461ce53f6361a5f23c6": {
+    "query": "SELECT * FROM items WHERE sku IN ($1) ORDER BY sku ASC",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "sku",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 1,
+          "name": "price",
+          "type_info": "Float8"
+        },
+        {
+          "ordinal": 2,
+          "name": "name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "description",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 4,
+          "name": "img_src",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
+          "name": "tags",
+          "type_info": "VarcharArray"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
       ]
     }
   },
@@ -171,8 +506,8 @@
       ]
     }
   },
-  "a374453e570d465fd16ba1e9017ed227faa7632a396cb4e17ed080cda0474bb8": {
-    "query": "\n            INSERT INTO shopping_carts (id, cart_type, currency)\n            VALUES ( $1, $2, $3 )\n            RETURNING\n                id, \n                cart_type as \"cart_type!: CartType\", \n                items as \"items!: Vec<(String, i32)>\",\n                currency as \"currency!: Currency\",\n                discounts, price_before_discounts, price_after_discounts,\n                created_at, last_modified\n            ",
+  "a7105b4751d117a3a8d0557e086190b423e8353a1c6c952845d07af6e066b601": {
+    "query": "\n            INSERT INTO shopping_carts (id, customer_id, cart_type, currency)\n            VALUES ( $1, $2, $3, $4)\n            RETURNING\n                id, customer_id, \n                cart_type as \"cart_type!: CartType\", \n                items as \"items!: Json<Vec<InternalCartItem>>\",\n                currency as \"currency!: Currency\",\n                discounts, price_before_discounts, price_after_discounts,\n                created_at, last_modified\n            ",
     "describe": {
       "columns": [
         {
@@ -182,6 +517,11 @@
         },
         {
           "ordinal": 1,
+          "name": "customer_id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
           "name": "cart_type!: CartType",
           "type_info": {
             "Custom": {
@@ -196,35 +536,12 @@
           }
         },
         {
-          "ordinal": 2,
-          "name": "items!: Vec<(String, i32)>",
-          "type_info": {
-            "Custom": {
-              "name": "_internal_cart_item",
-              "kind": {
-                "Array": {
-                  "Custom": {
-                    "name": "internal_cart_item",
-                    "kind": {
-                      "Composite": [
-                        [
-                          "sku",
-                          "Varchar"
-                        ],
-                        [
-                          "quantity",
-                          "Int4"
-                        ]
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          }
+          "ordinal": 3,
+          "name": "items!: Json<Vec<InternalCartItem>>",
+          "type_info": "Jsonb"
         },
         {
-          "ordinal": 3,
+          "ordinal": 4,
           "name": "currency!: Currency",
           "type_info": {
             "Custom": {
@@ -239,33 +556,34 @@
           }
         },
         {
-          "ordinal": 4,
+          "ordinal": 5,
           "name": "discounts",
           "type_info": "UuidArray"
         },
         {
-          "ordinal": 5,
+          "ordinal": 6,
           "name": "price_before_discounts",
           "type_info": "Float8"
         },
         {
-          "ordinal": 6,
+          "ordinal": 7,
           "name": "price_after_discounts",
           "type_info": "Float8"
         },
         {
-          "ordinal": 7,
+          "ordinal": 8,
           "name": "created_at",
           "type_info": "Timestamptz"
         },
         {
-          "ordinal": 8,
+          "ordinal": 9,
           "name": "last_modified",
           "type_info": "Timestamptz"
         }
       ],
       "parameters": {
         "Left": [
+          "Uuid",
           "Uuid",
           {
             "Custom": {
@@ -293,6 +611,7 @@
       },
       "nullable": [
         false,
+        true,
         false,
         true,
         false,
@@ -380,117 +699,6 @@
         false,
         false,
         true
-      ]
-    }
-  },
-  "ce138c6d33ce797c80a9474b079cbfe61d896acbc5e7ce9d8df1e5662b867d91": {
-    "query": "\n            SELECT\n                id, \n                cart_type as \"cart_type!: CartType\", \n                items as \"items!: Vec<(String, i32)>\",\n                currency as \"currency!: Currency\",\n                discounts, price_before_discounts, price_after_discounts,\n                created_at, last_modified\n            FROM shopping_carts WHERE id = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "cart_type!: CartType",
-          "type_info": {
-            "Custom": {
-              "name": "user_cart_type",
-              "kind": {
-                "Enum": [
-                  "ANONYMOUS",
-                  "KNOWN"
-                ]
-              }
-            }
-          }
-        },
-        {
-          "ordinal": 2,
-          "name": "items!: Vec<(String, i32)>",
-          "type_info": {
-            "Custom": {
-              "name": "_internal_cart_item",
-              "kind": {
-                "Array": {
-                  "Custom": {
-                    "name": "internal_cart_item",
-                    "kind": {
-                      "Composite": [
-                        [
-                          "sku",
-                          "Varchar"
-                        ],
-                        [
-                          "quantity",
-                          "Int4"
-                        ]
-                      ]
-                    }
-                  }
-                }
-              }
-            }
-          }
-        },
-        {
-          "ordinal": 3,
-          "name": "currency!: Currency",
-          "type_info": {
-            "Custom": {
-              "name": "currency_type",
-              "kind": {
-                "Enum": [
-                  "GBP",
-                  "USD"
-                ]
-              }
-            }
-          }
-        },
-        {
-          "ordinal": 4,
-          "name": "discounts",
-          "type_info": "UuidArray"
-        },
-        {
-          "ordinal": 5,
-          "name": "price_before_discounts",
-          "type_info": "Float8"
-        },
-        {
-          "ordinal": 6,
-          "name": "price_after_discounts",
-          "type_info": "Float8"
-        },
-        {
-          "ordinal": 7,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 8,
-          "name": "last_modified",
-          "type_info": "Timestamptz"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        true,
-        false,
-        true,
-        false,
-        false,
-        false,
-        false
       ]
     }
   },

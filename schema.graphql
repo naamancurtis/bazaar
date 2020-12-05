@@ -24,6 +24,7 @@ The input/output is a string in RFC3339 format.
 scalar DateTime
 type ShoppingCart {
 	id: UUID!
+	customerId: UUID
 	cartType: CartType!
 	discounts: [UUID!]
 	priceBeforeDiscounts: Float!
@@ -47,7 +48,7 @@ type CartItem {
 	pricePerUnit: Float!
 	name: String!
 	description: String!
-	imageSrc: String!
+	imgSrc: String!
 	tags: [String!]!
 }
 type MutationRoot {
@@ -55,11 +56,16 @@ type MutationRoot {
 	updateCustomer(id: UUID!, update: CustomerUpdate!): Customer!
 	createAnonymousCart(currency: Currency!): ShoppingCart!
 	createKnownCart(id: UUID!, currency: Currency!): ShoppingCart!
+	addItemToCustomersCart(customersId: UUID!, newItem: AddCartItem!): ShoppingCart!
 }
 input CustomerUpdate {
 email: String!
 firstName: String!
 lastName: String!
+}
+input AddCartItem {
+sku: String!
+quantity: Int!
 }
 schema {
 	query: QueryRoot

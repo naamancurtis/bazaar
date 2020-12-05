@@ -142,10 +142,9 @@ impl Customer {
             .await
         });
         let cloned_pool = pool.clone();
-        let new_cart_future =
-            tokio::spawn(
-                async move { ShoppingCart::new_known(cart_id, currency, &cloned_pool).await },
-            );
+        let new_cart_future = tokio::spawn(async move {
+            ShoppingCart::new_known(cart_id, id, currency, &cloned_pool).await
+        });
 
         let (_, cart) = futures::future::join(updated_customer_future, new_cart_future).await;
         cart?
