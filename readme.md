@@ -1,4 +1,4 @@
-# Bazaar
+# Bazaar [WIP]
 
 [![CircleCI Build Status](https://circleci.com/gh/naamancurtis/bazaar.svg?style=shield)](https://app.circleci.com/pipelines/github/naamancurtis/bazaar)
 

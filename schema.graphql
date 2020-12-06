@@ -13,7 +13,6 @@ type Customer {
 	lastName: String!
 	createdAt: DateTime!
 	lastModified: DateTime!
-	cartId: UUID
 	cart: ShoppingCart
 }
 scalar UUID
@@ -25,12 +24,15 @@ The input/output is a string in RFC3339 format.
 scalar DateTime
 type ShoppingCart {
 	id: UUID!
+	customerId: UUID
 	cartType: CartType!
-	items: [String!]!
-	priceBeforeDiscounts: Float!
 	discounts: [UUID!]
+	priceBeforeDiscounts: Float!
 	priceAfterDiscounts: Float!
 	currency: Currency!
+	createdAt: DateTime!
+	lastModified: DateTime!
+	items: [CartItem!]!
 }
 enum CartType {
 	ANONYMOUS
@@ -40,14 +42,30 @@ enum Currency {
 	GBP
 	USD
 }
+type CartItem {
+	sku: String!
+	quantity: Int!
+	pricePerUnit: Float!
+	name: String!
+	description: String!
+	imgSrc: String!
+	tags: [String!]!
+}
 type MutationRoot {
 	createCustomer(email: String!, firstName: String!, lastName: String!): Customer!
 	updateCustomer(id: UUID!, update: CustomerUpdate!): Customer!
+	createAnonymousCart(currency: Currency!): ShoppingCart!
+	createKnownCart(id: UUID!, currency: Currency!): ShoppingCart!
+	addItemsToCart(id: UUID!, updatedItems: [UpdateCartItem!]!): ShoppingCart!
 }
 input CustomerUpdate {
 email: String!
 firstName: String!
 lastName: String!
+}
+input UpdateCartItem {
+sku: String!
+quantity: Int!
 }
 schema {
 	query: QueryRoot

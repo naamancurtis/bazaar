@@ -29,7 +29,7 @@ pub fn build_app(listener: TcpListener, connection: PgPool) -> Result<Server, st
             .data(connection.clone())
             .service(web::resource("/").guard(guard::Post()).to(graphql_index))
             .service(
-                web::resource("/")
+                web::resource("/playground")
                     .guard(guard::Get())
                     .to(graphql_playground),
             )

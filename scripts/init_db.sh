@@ -39,3 +39,7 @@ sqlx database create
 sqlx migrate run
 
 >&2 echo "Postgres has been migrated, ready to go!"
+
+PGPASSWORD="${DB_PASSWORD}" psql -U "${DB_USER}" -d "${DB_NAME}" -h "localhost"  -p "${DB_PORT}" -f ./scripts/seed_items.sql
+
+>&2 echo "Successfully seeded database items"

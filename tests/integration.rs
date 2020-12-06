@@ -1,15 +1,14 @@
-use lazy_static::lazy_static;
-use serde::{Deserialize, Serialize};
+use anyhow::Result;
+use assert_json_diff::assert_json_include;
+use chrono::DateTime;
 use serde_json::json;
-use std::collections::HashMap;
-use std::fmt;
 use uuid::Uuid;
 
-use bazaar::{
-    configuration::DatabaseSettings,
-    models::Customer,
-    telemetry::{generate_subscriber, init_subscriber},
-};
+mod helpers;
+
+use helpers::*;
+
+use bazaar::models::{Customer, ShoppingCart};
 
 const CUSTOMER_GRAPHQL_FIELDS: &str = "#
 id,
@@ -20,22 +19,23 @@ createdAt,
 lastModified
 #";
 
-lazy_static! {
-    /// To ensure logs are only outputted in tests when requred, by default
-    /// tests run with no logs being captured
-    ///
-    /// In order to set logs to be captured during tests run them with:
-    /// `TEST_LOG=true cargo test health_check_works | bunyan`
-    static ref TRACING: () = {
-        let filter = if std::env::var("TEST_LOG").is_ok() {
-            "debug"
-        } else {
-            ""
-        };
-        let subscriber = generate_subscriber("test".to_string(), filter.into());
-        init_subscriber(subscriber);
-    };
+const SHOPPING_CART_GRAPHQL_FIELDS: &str = "#
+id
+cartType
+items {
+   sku 
+   quantity
+   pricePerUnit
+   name
+   tags
 }
+priceBeforeDiscounts
+discounts
+priceAfterDiscounts
+currency
+lastModified
+createdAt
+#";
 
 #[actix_rt::test]
 async fn health_check_works() {
@@ -54,7 +54,7 @@ async fn health_check_works() {
 }
 
 #[actix_rt::test]
-async fn create_customer_mutation_works() -> Result<(), Box<dyn std::error::Error>> {
+async fn mutation_create_customer_works() -> Result<()> {
     let app = spawn_app().await;
     let client = reqwest::Client::new();
 
@@ -84,34 +84,28 @@ async fn create_customer_mutation_works() -> Result<(), Box<dyn std::error::Erro
     dbg!(&body);
 
     let response = client.post(&app.address).json(&body).send().await?;
+    let data = response.json::<serde_json::Value>().await?["data"]["createCustomer"].clone();
 
-    #[derive(Debug, Deserialize)]
-    struct CreateCustomerResponse {
-        #[serde(rename = "createCustomer")]
-        create_customer: Customer,
-    }
-
-    let response = response.json::<Response<CreateCustomerResponse>>().await?;
-
-    let customer = response
-        .data
-        .expect("successful response should contain data")
-        .create_customer;
-
-    assert_eq!(customer.email, email);
-    assert_eq!(customer.first_name, first_name.to_string());
-    assert_eq!(customer.last_name, last_name.to_string());
+    assert_json_include!(
+        actual: data,
+        expected: json!({
+            "email": email,
+            "firstName": first_name,
+            "lastName": last_name,
+        })
+    );
     Ok(())
 }
 
 #[actix_rt::test]
-async fn query_customer_by_id_mutation_works() -> Result<(), Box<dyn std::error::Error>> {
+async fn query_customer_by_id_works() -> Result<()> {
     let app = spawn_app().await;
     let client = reqwest::Client::new();
 
     let customer_id = insert_default_customer(&app.db_pool)
-        .await
-        .expect("default customer failed to be created");
+        .await?
+        .customer
+        .unwrap();
 
     let graphql_mutatation = format!(
         r#"
@@ -134,31 +128,13 @@ async fn query_customer_by_id_mutation_works() -> Result<(), Box<dyn std::error:
     dbg!(&body);
 
     let response = client.post(&app.address).json(&body).send().await?;
-
-    #[derive(Debug, Deserialize)]
-    struct CustomerQueryResponse {
-        #[serde(rename = "customerById")]
-        customer_by_id: Option<Customer>,
-    }
-
-    let response = response.json::<Response<CustomerQueryResponse>>().await?;
-    dbg!(&response);
-
-    let customer = response
-        .data
-        .expect("successful response should contain data")
-        .customer_by_id;
-    assert!(customer.is_some());
-    let customer = customer.unwrap();
-
-    assert_eq!(customer.email, format!("{}@test.com", Uuid::nil()));
-    assert_eq!(customer.first_name, Uuid::nil().to_string());
-    assert_eq!(customer.last_name, Uuid::nil().to_string());
+    let data = response.json::<serde_json::Value>().await?["data"]["customerById"].clone();
+    assert_json_include!(actual: data, expected: DEFAULT_CUSTOMER.clone());
     Ok(())
 }
 
 #[actix_rt::test]
-async fn query_customer_by_email_mutation_works() -> Result<(), Box<dyn std::error::Error>> {
+async fn query_customer_by_email_works() -> Result<(), Box<dyn std::error::Error>> {
     let app = spawn_app().await;
     let client = reqwest::Client::new();
 
@@ -187,38 +163,20 @@ async fn query_customer_by_email_mutation_works() -> Result<(), Box<dyn std::err
     dbg!(&body);
 
     let response = client.post(&app.address).json(&body).send().await?;
-
-    #[derive(Debug, Deserialize)]
-    struct CustomerQueryResponse {
-        #[serde(rename = "customerByEmail")]
-        customer_by_email: Option<Customer>,
-    }
-
-    let response = response.json::<Response<CustomerQueryResponse>>().await?;
-    dbg!(&response);
-
-    let customer = response
-        .data
-        .expect("successful response should contain data")
-        .customer_by_email;
-
-    assert!(customer.is_some());
-    let customer = customer.unwrap();
-
-    assert_eq!(customer.email, format!("{}@test.com", Uuid::nil()));
-    assert_eq!(customer.first_name, Uuid::nil().to_string());
-    assert_eq!(customer.last_name, Uuid::nil().to_string());
+    let data = response.json::<serde_json::Value>().await?["data"]["customerByEmail"].clone();
+    assert_json_include!(actual: data, expected: DEFAULT_CUSTOMER.clone());
     Ok(())
 }
 
 #[actix_rt::test]
-async fn update_customer_mutation_works() -> Result<(), Box<dyn std::error::Error>> {
+async fn mutation_update_customer_works() -> Result<()> {
     let app = spawn_app().await;
     let client = reqwest::Client::new();
 
     let customer_id = insert_default_customer(&app.db_pool)
-        .await
-        .expect("default customer failed to be created");
+        .await?
+        .customer
+        .unwrap();
 
     let graphql_mutatation = format!(
         r#"
@@ -246,161 +204,232 @@ async fn update_customer_mutation_works() -> Result<(), Box<dyn std::error::Erro
     dbg!(&body);
 
     let response = client.post(&app.address).json(&body).send().await?;
+    let data = response.json::<serde_json::Value>().await?["data"]["updateCustomer"].clone();
+    dbg!(&data);
 
-    #[derive(Debug, Deserialize)]
-    struct CustomerUpdateResponse {
-        #[serde(rename = "updateCustomer")]
-        update_customer: Customer,
-    }
+    assert_json_include!(
+        actual: &data,
+        expected: json!({
+            "firstName": "updated",
+            "lastName": "updated",
+            "email": "updated@test.com"
+        })
+    );
 
-    let response = response.json::<Response<CustomerUpdateResponse>>().await?;
-    dbg!(&response);
+    let last_modified = DateTime::parse_from_rfc3339(&data["lastModified"].as_str().unwrap())
+        .expect("date should parse correctly with rfc3339");
+    let created_at = DateTime::parse_from_rfc3339(&data["createdAt"].as_str().unwrap())
+        .expect("date should parse correctly with rfc3339");
 
-    let customer = response
-        .data
-        .expect("successful response should contain data")
-        .update_customer;
-
-    assert_eq!(customer.email, format!("{}@test.com", "updated"));
-    assert_eq!(customer.first_name, "updated".to_string());
-    assert_eq!(customer.last_name, "updated".to_string());
-    assert!(customer.last_modified > customer.created_at);
+    assert!(last_modified > created_at);
     Ok(())
 }
-use sqlx::{Connection, Executor, PgConnection, PgPool};
-use std::net::TcpListener;
 
-pub struct TestApp {
-    pub address: String,
-    pub db_pool: PgPool,
-}
+#[actix_rt::test]
+async fn mutation_create_anonymous_cart_works() -> Result<()> {
+    let app = spawn_app().await;
+    let client = reqwest::Client::new();
 
-pub async fn spawn_app() -> TestApp {
-    lazy_static::initialize(&TRACING);
+    let graphql_mutatation = format!(
+        r#"
+        mutation createAnonymousCart($currency: Currency!) {{
+            createAnonymousCart(currency: $currency) {{
+                {}
+            }}
+        }}
+    "#,
+        SHOPPING_CART_GRAPHQL_FIELDS
+    );
 
-    let listener = TcpListener::bind("127.0.0.1:0").expect("failed to bind random port");
-    let port = listener.local_addr().unwrap().port();
-
-    let mut configuration = bazaar::get_configuration().expect("failed to read configuration");
-
-    let database_name = Uuid::new_v4().to_string();
-    configuration.set_database_name(database_name);
-
-    let pool = configure_database(&configuration.database).await;
-
-    let server = bazaar::build_app(listener, pool.clone()).expect("failed to bind address");
-
-    let _ = tokio::spawn(server);
-    TestApp {
-        address: format!("http://127.0.0.1:{}", port),
-        db_pool: pool,
-    }
-}
-
-pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
-    let mut connection = PgConnection::connect_with(&config.without_db())
-        .await
-        .expect("failed to connect to database");
-    connection
-        .execute(&*format!(r#"CREATE DATABASE "{}";"#, config.database_name))
-        .await
-        .expect("failed to create database");
-
-    let pool = PgPool::connect_with(config.with_db())
-        .await
-        .expect("failed to connect to database");
-    sqlx::migrate!("./migrations")
-        .run(&pool)
-        .await
-        .expect("failed to run database migrations");
-    pool
-}
-
-pub async fn insert_default_customer(pool: &PgPool) -> Result<Uuid, Box<dyn std::error::Error>> {
-    let email = format!("{}@test.com", Uuid::nil());
-    let first_name = Uuid::nil().to_string();
-    let last_name = Uuid::nil().to_string();
-
-    let customer = Customer::new(email, first_name, last_name, pool).await;
-    dbg!(&customer);
-    let customer = customer.expect("failed to insert default customer");
-    Ok(customer.id)
-}
-
-// Taken from https://github.com/graphql-rust/graphql-client
-
-#[derive(Debug, Serialize, Deserialize, PartialEq)]
-pub struct Response<Data> {
-    /// The absent, partial or complete response data.
-    pub data: Option<Data>,
-    /// The top-level errors returned by the server.
-    pub errors: Option<Vec<Error>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-pub struct Error {
-    /// The human-readable error message. This is the only required field.
-    pub message: String,
-    /// Which locations in the query the error applies to.
-    pub locations: Option<Vec<Location>>,
-    /// Which path in the query the error applies to, e.g. `["users", 0, "email"]`.
-    pub path: Option<Vec<PathFragment>>,
-    /// Additional errors. Their exact format is defined by the server.
-    pub extensions: Option<HashMap<String, serde_json::Value>>,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq, Default)]
-pub struct Location {
-    /// The line number in the query string where the error originated (starting from 1).
-    pub line: i32,
-    /// The column number in the query string where the error originated (starting from 1).
-    pub column: i32,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize, PartialEq)]
-#[serde(untagged)]
-pub enum PathFragment {
-    /// A key inside an object
-    Key(String),
-    /// An index inside an array
-    Index(i32),
-}
-
-impl fmt::Display for PathFragment {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        match *self {
-            PathFragment::Key(ref key) => write!(f, "{}", key),
-            PathFragment::Index(ref idx) => write!(f, "{}", idx),
+    let body = json!({
+        "query": graphql_mutatation,
+        "variables": {
+            "currency": "GBP",
         }
-    }
+    });
+
+    dbg!(&body);
+
+    let response = client.post(&app.address).json(&body).send().await?;
+    let data = response.json::<serde_json::Value>().await?["data"]["createAnonymousCart"].clone();
+    assert_json_include!(
+        actual: data,
+        expected: json!({
+            "currency": "GBP",
+            "cartType": "ANONYMOUS",
+            "items": []
+        })
+    );
+
+    Ok(())
 }
 
-impl fmt::Display for Error {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        // Use `/` as a separator like JSON Pointer.
-        let path = self
-            .path
-            .as_ref()
-            .map(|fragments| {
-                fragments
-                    .iter()
-                    .fold(String::new(), |mut acc, item| {
-                        acc.push_str(&format!("{}/", item));
-                        acc
-                    })
-                    .trim_end_matches('/')
-                    .to_string()
-            })
-            .unwrap_or_else(|| "<query>".to_string());
+#[actix_rt::test]
+async fn mutation_create_known_cart_works() -> Result<()> {
+    let app = spawn_app().await;
+    let client = reqwest::Client::new();
 
-        // Get the location of the error. We'll use just the first location for this.
-        let loc = self
-            .locations
-            .as_ref()
-            .and_then(|locations| locations.iter().next())
-            .cloned()
-            .unwrap_or_else(Location::default);
+    let customer = insert_default_customer(&app.db_pool)
+        .await?
+        .customer
+        .unwrap();
 
-        write!(f, "{}:{}:{}: {}", path, loc.line, loc.column, self.message)
-    }
+    let graphql_mutatation = format!(
+        r#"
+        mutation createKnownCart($id: UUID!, $currency: Currency!) {{
+            createKnownCart(id: $id, currency: $currency) {{
+                {}
+            }}
+        }}
+    "#,
+        SHOPPING_CART_GRAPHQL_FIELDS
+    );
+
+    let body = json!({
+        "query": graphql_mutatation,
+        "variables": {
+            "currency": "GBP",
+            "id": customer
+        }
+    });
+
+    dbg!(&body);
+    let response = client.post(&app.address).json(&body).send().await?;
+    dbg!(&response);
+    let data = response.json::<serde_json::Value>().await?["data"]["createKnownCart"].clone();
+    assert_json_include!(
+        actual: &data,
+        expected: json!({
+            "currency": "GBP",
+            "cartType": "KNOWN",
+            "items": []
+        })
+    );
+
+    let customer = Customer::find_by_id(customer, &app.db_pool)
+        .await
+        .expect("failed to query customer from the database")
+        .expect("failed to find customer");
+    assert_eq!(
+        customer.cart_id.expect("customer should have cart id"),
+        Uuid::parse_str(&data["id"].as_str().expect("Cart should always have an ID"))
+            .expect("cart id should be valid UUID")
+    );
+    Ok(())
+}
+
+#[actix_rt::test]
+async fn mutation_create_known_cart_doesnt_recreate_existing_cart() -> Result<()> {
+    let app = spawn_app().await;
+    let client = reqwest::Client::new();
+
+    let ids = insert_default_customer_with_cart(&app.db_pool).await?;
+
+    let graphql_mutatation = format!(
+        r#"
+        mutation createKnownCart($id: UUID!, $currency: Currency!) {{
+            createKnownCart(id: $id, currency: $currency) {{
+                {}
+            }}
+        }}
+    "#,
+        SHOPPING_CART_GRAPHQL_FIELDS
+    );
+
+    let body = json!({
+        "query": graphql_mutatation,
+        "variables": {
+            "currency": "GBP",
+            "id": ids.customer.unwrap()
+        }
+    });
+
+    dbg!(&body);
+
+    let response = client.post(&app.address).json(&body).send().await?;
+
+    dbg!(&response);
+    let data = response.json::<serde_json::Value>().await?["data"]["createKnownCart"].clone();
+    assert_json_include!(
+        actual: &data,
+        expected: json!({
+            "id": ids.cart,
+            "currency": "GBP",
+            "cartType": "KNOWN",
+            "items": []
+        })
+    );
+
+    let customer = Customer::find_by_id(ids.customer.unwrap(), &app.db_pool)
+        .await
+        .expect("failed to query customer from the database")
+        .expect("failed to find customer");
+
+    assert_eq!(
+        customer.cart_id.expect("customer should have cart id"),
+        Uuid::parse_str(&data["id"].as_str().expect("Cart should always have an ID"))
+            .expect("cart id should be valid UUID")
+    );
+    Ok(())
+}
+
+#[actix_rt::test]
+async fn mutation_add_item_to_cart_works() -> Result<()> {
+    let app = spawn_app().await;
+    let client = reqwest::Client::new();
+
+    let ids = insert_default_customer_with_cart(&app.db_pool).await?;
+
+    let graphql_mutatation = format!(
+        r#"
+        mutation addItemsToCart($id: UUID!, $updatedItems: [UpdateCartItem!]!) {{
+            addItemsToCart(id: $id, updatedItems: $updatedItems) {{
+                {}
+            }}
+        }}
+    "#,
+        SHOPPING_CART_GRAPHQL_FIELDS
+    );
+
+    let body = json!({
+        "query": graphql_mutatation,
+        "variables": {
+            "id": ids.cart.unwrap(),
+            "updatedItems": [{
+                "sku": "12345678",
+                "quantity": 3
+            }]
+        }
+    });
+
+    dbg!(&body);
+    let response = client.post(&app.address).json(&body).send().await?;
+    let data = response.json::<serde_json::Value>().await?["data"]["addItemsToCart"].clone();
+    dbg!(&data);
+
+    assert_json_include!(
+        actual: &data,
+        expected: json!({
+            "id": ids.cart,
+            "currency": "GBP",
+            "cartType": "KNOWN",
+            "items": [{
+                "sku": "12345678",
+                "quantity": 3,
+                "name": "Item 1",
+                "tags": []
+            }],
+        })
+    );
+    assert_on_decimal(data["priceBeforeDiscounts"].as_f64().unwrap(), 2.97);
+    assert_on_decimal(data["priceAfterDiscounts"].as_f64().unwrap(), 2.97);
+    assert_on_decimal(data["items"][0]["pricePerUnit"].as_f64().unwrap(), 0.99);
+
+    let cart = ShoppingCart::find_by_id(ids.cart.unwrap(), &app.db_pool)
+        .await
+        .expect("should be able to fetch cart");
+    dbg!(&cart);
+    assert_eq!(cart.items.len(), 1);
+    assert_on_decimal(cart.price_before_discounts, 2.97);
+    Ok(())
 }

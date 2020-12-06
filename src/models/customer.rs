@@ -4,10 +4,10 @@ use async_graphql::{
 };
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
-use sqlx::{query_as, PgPool};
+use sqlx::{query, query_as, PgPool};
 use uuid::Uuid;
 
-use crate::models::ShoppingCart;
+use crate::models::{Currency, ShoppingCart};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all(serialize = "snake_case", deserialize = "camelCase"))]
@@ -116,6 +116,57 @@ impl Customer {
         .await?;
         Ok(updated_customer)
     }
+
+    #[tracing::instrument(skip(pool), fields(model = "Customer"))]
+    pub async fn add_new_cart(id: Uuid, currency: Currency, pool: &PgPool) -> Result<ShoppingCart> {
+        if let Some(cart_id) = Customer::check_cart(id, pool).await {
+            return ShoppingCart::find_by_id(cart_id, pool).await;
+        }
+        let cart_id = Uuid::new_v4();
+
+        let cloned_pool = pool.clone();
+        let updated_customer_future = tokio::spawn(async move {
+            query!(
+                r#"
+            UPDATE customers
+            SET cart_id = $1
+            WHERE id = $2;
+            "#,
+                cart_id,
+                id
+            )
+            .fetch_one(&cloned_pool)
+            .await
+        });
+        let cloned_pool = pool.clone();
+        let new_cart_future = tokio::spawn(async move {
+            ShoppingCart::new_known(cart_id, id, currency, &cloned_pool).await
+        });
+
+        let (_, cart) = futures::future::join(updated_customer_future, new_cart_future).await;
+        cart?
+    }
+}
+
+/// Private API
+impl Customer {
+    #[tracing::instrument(skip(pool), fields(model = "Customer"))]
+    async fn check_cart(id: Uuid, pool: &PgPool) -> Option<Uuid> {
+        let result = query!(
+            r#"
+            SELECT cart_id FROM customers WHERE id = $1
+            "#,
+            id
+        )
+        .fetch_optional(pool)
+        .await
+        .ok()
+        .flatten();
+        if let Some(result) = result {
+            return result.cart_id;
+        }
+        None
+    }
 }
 
 /// Graphql Resolver
@@ -144,18 +195,10 @@ impl Customer {
         self.last_modified
     }
 
-    async fn cart_id(&self) -> Option<Uuid> {
-        self.cart_id
-    }
-
     async fn cart(&self, ctx: &Context<'_>) -> Option<ShoppingCart> {
         let pool = ctx.data::<PgPool>().ok()?;
         if let Some(cart_id) = self.cart_id {
-            return match ShoppingCart::find_by_id(cart_id, pool).await {
-                Ok(Some(cart)) => Some(cart),
-                Ok(None) => None,
-                Err(_) => None,
-            };
+            return ShoppingCart::find_by_id(cart_id, pool).await.ok();
         }
         None
     }
