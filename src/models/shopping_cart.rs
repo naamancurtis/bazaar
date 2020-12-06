@@ -261,7 +261,8 @@ impl ShoppingCart {
         self.last_modified
     }
 
-    // @TODO - Actually implement this
+    // @TODO - Implement proper error handling for this - theres quite a few layers that could
+    // potentially go wrong
     async fn items(&self, ctx: &Context<'_>) -> Vec<CartItem> {
         if self.items.is_empty() {
             return Vec::new();
@@ -269,7 +270,7 @@ impl ShoppingCart {
         if let Ok(pool) = ctx.data::<PgPool>() {
             let items = CartItem::find_multiple(&self.items, pool)
                 .await
-                .expect("need to fix this");
+                .expect("error occurred while trying to find cart items");
             return items;
         }
         Vec::new()
