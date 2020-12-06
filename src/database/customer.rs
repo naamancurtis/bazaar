@@ -23,7 +23,7 @@ pub trait CustomerRepository {
     async fn find_all(pool: &PgPool) -> Result<Vec<Customer>>;
     async fn find_by_id(id: Uuid, pool: &PgPool) -> Result<Customer>;
     async fn find_by_email(email: String, pool: &PgPool) -> Result<Customer>;
-    async fn check_cart(id: Uuid, pool: &PgPool) -> Option<Uuid>;
+    async fn check_cart(id: Uuid, pool: &PgPool) -> Result<Uuid>;
     async fn update(id: Uuid, update: Vec<CustomerUpdate>, pool: &PgPool) -> Result<()>;
     async fn add_new_cart(
         customer_id: Uuid,
@@ -31,6 +31,8 @@ pub trait CustomerRepository {
         currency: Currency,
         pool: &PgPool,
     ) -> Result<ShoppingCart>;
+    async fn fetch_refresh_token_counter(id: Uuid, pool: &PgPool) -> Result<i32>;
+    async fn increment_refresh_token_counter(id: Uuid, pool: &PgPool) -> Result<i32>;
 }
 
 pub struct CustomerDatabase;
@@ -221,20 +223,44 @@ impl CustomerRepository for CustomerDatabase {
     }
 
     #[tracing::instrument(skip(pool), fields(repository = "customer"))]
-    async fn check_cart(id: Uuid, pool: &PgPool) -> Option<Uuid> {
-        if let Some(result) = query!(
+    async fn check_cart(id: Uuid, pool: &PgPool) -> Result<Uuid> {
+        let cart_id = query!(
             r#"
             SELECT cart_id FROM customers WHERE id = $1
             "#,
             id
         )
-        .fetch_optional(pool)
-        .await
-        .ok()
-        .flatten()
-        {
-            return result.cart_id;
-        }
-        None
+        .fetch_one(pool)
+        .await?;
+        Ok(cart_id.cart_id)
+    }
+
+    #[tracing::instrument(skip(pool), fields(repository = "customer"))]
+    async fn fetch_refresh_token_counter(id: Uuid, pool: &PgPool) -> Result<i32> {
+        let count = query!(
+            r#"
+            SELECT refresh_token_count FROM customers WHERE id = $1
+            "#,
+            id
+        )
+        .fetch_one(pool)
+        .await?;
+        Ok(count.refresh_token_count)
+    }
+
+    #[tracing::instrument(skip(pool), fields(repository = "customer"))]
+    async fn increment_refresh_token_counter(id: Uuid, pool: &PgPool) -> Result<i32> {
+        let count = query!(
+            r#"
+            UPDATE customers
+            SET refresh_token_count = refresh_token_count + 1
+            WHERE id = $1
+            RETURNING refresh_token_count
+            "#,
+            id
+        )
+        .fetch_one(pool)
+        .await?;
+        Ok(count.refresh_token_count)
     }
 }

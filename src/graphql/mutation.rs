@@ -6,12 +6,12 @@ use tracing::error;
 use uuid::Uuid;
 
 use crate::{
-    auth::{generate_tokens, verify_password_and_fetch_details, BazaarTokens},
+    auth::{generate_new_tokens, verify_password_and_fetch_details},
     database::{AuthDatabase, CartItemDatabase, CustomerDatabase, ShoppingCartDatabase},
     graphql::{extract_token_and_database_pool, validators::ValidCustomerUpdateType},
     models::{
         cart_item::{InternalCartItem, UpdateCartItem},
-        Currency, Customer, CustomerType, CustomerUpdate, ShoppingCart, TokenType,
+        BazaarTokens, Currency, Customer, CustomerType, CustomerUpdate, ShoppingCart, TokenType,
     },
     BazaarError,
 };
@@ -66,7 +66,14 @@ impl MutationRoot {
             .await?;
             assert_eq!(id, cart_id);
         }
-        generate_tokens(Some(customer_details.public_id), cart_id).map_err(|e| e.extend())
+        generate_new_tokens::<CustomerDatabase>(
+            Some(customer_details.public_id),
+            Some(customer_details.id),
+            cart_id,
+            pool,
+        )
+        .await
+        .map_err(|e| e.extend())
     }
 
     #[tracing::instrument(skip(self, ctx))]
@@ -84,7 +91,9 @@ impl MutationRoot {
             return Err(BazaarError::BadRequest("Valid token already exists".to_string()).extend());
         };
         let cart = ShoppingCart::new_anonymous::<ShoppingCartDatabase>(Currency::GBP, pool).await?;
-        generate_tokens(None, cart.id).map_err(|e| e.extend())
+        generate_new_tokens::<CustomerDatabase>(None, None, cart.id, pool)
+            .await
+            .map_err(|e| e.extend())
     }
 
     #[tracing::instrument(skip(self, ctx, password, first_name, last_name, email))]
@@ -131,7 +140,14 @@ impl MutationRoot {
             error!(?err, "failed to create new customer");
             err.extend()
         })?;
-        generate_tokens(Some(ids.public_id), ids.cart_id).map_err(|e| e.extend())
+        generate_new_tokens::<CustomerDatabase>(
+            Some(ids.public_id),
+            Some(ids.id),
+            ids.cart_id,
+            pool,
+        )
+        .await
+        .map_err(|e| e.extend())
     }
 
     #[tracing::instrument(skip(self, ctx, update))]

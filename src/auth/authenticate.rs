@@ -92,17 +92,17 @@ mod tests {
     use claim::assert_ok;
     use uuid::Uuid;
 
-    use crate::database::AuthRepository;
+    use crate::{database::AuthRepository, Result};
 
     struct MockAuthRepo;
 
     #[async_trait]
     impl AuthRepository for MockAuthRepo {
-        async fn map_id(_: Option<Uuid>, _: &PgPool) -> Option<Uuid> {
-            None
+        async fn map_id(_: Option<Uuid>, _: &PgPool) -> Result<Option<Uuid>> {
+            unimplemented!()
         }
         // Hacky, but just returning the email - so pass the hash through as the email
-        async fn get_auth_customer(email: &str, _: &PgPool) -> Result<AuthCustomer, BazaarError> {
+        async fn get_auth_customer(email: &str, _: &PgPool) -> Result<AuthCustomer> {
             Ok(AuthCustomer {
                 id: Uuid::new_v4(),
                 public_id: Uuid::new_v4(),

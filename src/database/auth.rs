@@ -6,7 +6,7 @@ use crate::{models::auth::AuthCustomer, Result};
 
 #[async_trait]
 pub trait AuthRepository {
-    async fn map_id(id: Option<Uuid>, pool: &PgPool) -> Option<Uuid>;
+    async fn map_id(id: Option<Uuid>, pool: &PgPool) -> Result<Option<Uuid>>;
     async fn get_auth_customer(email: &str, pool: &PgPool) -> Result<AuthCustomer>;
 }
 
@@ -15,9 +15,9 @@ pub struct AuthDatabase;
 #[async_trait]
 impl AuthRepository for AuthDatabase {
     #[tracing::instrument(skip(pool, id), fields(repository = "auth"))]
-    async fn map_id(id: Option<Uuid>, pool: &PgPool) -> Option<Uuid> {
+    async fn map_id(id: Option<Uuid>, pool: &PgPool) -> Result<Option<Uuid>> {
         if id.is_none() {
-            return id;
+            return Ok(id);
         }
         let private_id = query!(
             r#"
@@ -25,12 +25,9 @@ impl AuthRepository for AuthDatabase {
             "#,
             id
         )
-        .fetch_optional(pool)
-        .await
-        .ok()
-        .flatten()
-        .map(|s| s.id)?;
-        Some(private_id)
+        .fetch_one(pool)
+        .await?;
+        Ok(Some(private_id.id))
     }
 
     #[tracing::instrument(skip(pool, email), fields(repository = "auth"))]

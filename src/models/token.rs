@@ -25,6 +25,7 @@ pub struct BazaarToken {
     pub customer_type: CustomerType,
     pub cart_id: Uuid,
     pub token_type: TokenType,
+    pub count: Option<i32>,
     sub: Option<Uuid>,
     /// This is to ensure this token isn't constructable outside of this module
     /// ie. the only viable way to construct a token is with `Trait: From<TokenData<Claims>>`
@@ -39,6 +40,7 @@ impl From<TokenData<Claims>> for BazaarToken {
                 pub_id = ?claims.sub,
                 cart_id = ?claims.cart_id,
                 customer_type = ?claims.customer_type,
+                count = ?claims.count,
                 "expected to find private ID but nothing was found"
             );
         }
@@ -49,6 +51,7 @@ impl From<TokenData<Claims>> for BazaarToken {
             customer_type: claims.customer_type,
             cart_id: claims.cart_id,
             token_type: claims.token_type,
+            count: claims.count,
             sub: claims.sub,
             _marker: PhantomData,
         }
@@ -81,7 +84,7 @@ impl BazaarToken {
     }
 }
 
-fn utc_from_timestamp(timestamp: usize) -> DateTime<Utc> {
+pub(crate) fn utc_from_timestamp(timestamp: usize) -> DateTime<Utc> {
     let duration = NaiveDateTime::from_timestamp(timestamp as i64, 0);
     DateTime::from_utc(duration, Utc)
 }
@@ -89,7 +92,7 @@ fn utc_from_timestamp(timestamp: usize) -> DateTime<Utc> {
 #[derive(Debug, Serialize, Deserialize, PartialEq, Eq, Clone, Copy)]
 pub enum TokenType {
     Access,
-    Refresh,
+    Refresh(i32),
 }
 
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
@@ -100,6 +103,8 @@ pub struct Claims {
     pub exp: usize,
     pub iat: usize,
     pub token_type: TokenType,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub count: Option<i32>,
     #[serde(skip)]
     pub id: Option<Uuid>,
 }
@@ -149,7 +154,7 @@ pub async fn parse_and_deserialize_token<R: AuthRepository>(
     pool: &PgPool,
 ) -> Result<BazaarToken, BazaarError> {
     let mut token_data = decode_token(&token, token_type)?;
-    let id = R::map_id(token_data.claims.sub, pool).await;
+    let id = R::map_id(token_data.claims.sub, pool).await?;
     token_data.claims.id = id;
     Ok(BazaarToken::from(token_data))
 }
@@ -163,17 +168,18 @@ mod tests {
     use crate::{
         models::auth::AuthCustomer,
         test_helpers::{create_valid_jwt_token, set_token_env_vars_for_tests},
+        Result,
     };
 
     struct MockAuthRepo;
 
     #[async_trait]
     impl AuthRepository for MockAuthRepo {
-        async fn map_id(_: Option<Uuid>, _: &PgPool) -> Option<Uuid> {
-            Some(Uuid::new_v4())
+        async fn map_id(_: Option<Uuid>, _: &PgPool) -> Result<Option<Uuid>> {
+            Ok(Some(Uuid::new_v4()))
         }
 
-        async fn get_auth_customer(_: &str, _: &PgPool) -> Result<AuthCustomer, BazaarError> {
+        async fn get_auth_customer(_: &str, _: &PgPool) -> Result<AuthCustomer> {
             unimplemented!("Not used for these tests");
         }
     }

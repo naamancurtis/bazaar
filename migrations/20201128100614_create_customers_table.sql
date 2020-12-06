@@ -6,7 +6,8 @@ CREATE TABLE customers(
   last_name TEXT NOT NULL,
   created_at timestamptz NOT NULL DEFAULT NOW(),
   last_modified timestamptz NOT NULL DEFAULT NOW(),
-  cart_id uuid
+  cart_id uuid NOT NULL,
+  refresh_token_count INT NOT NULL DEFAULT 0
 );
 
 CREATE INDEX email_address_idx ON customers (email);

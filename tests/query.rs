@@ -66,7 +66,7 @@ async fn query_customer_works_for_known_user() -> Result<()> {
     assert_json_include!(
         actual: data,
         expected: json!({
-            "id": tokens.customer.id.unwrap(),
+            "id": tokens.customer.public_id.unwrap(),
             "firstName": "Bruce",
             "lastName": "Wayne",
             "email": "imbatman@test.com",
@@ -103,7 +103,7 @@ async fn query_customer_with_known_user_includes_cart() -> Result<()> {
     assert_json_include!(
         actual: data,
         expected: json!({
-            "id": tokens.customer.id.unwrap(),
+            "id": tokens.customer.public_id.unwrap(),
             "firstName": "Bruce",
             "lastName": "Wayne",
             "email": "imbatman@test.com",
