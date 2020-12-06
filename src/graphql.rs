@@ -5,7 +5,10 @@ use async_graphql::{
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::models::{cart_item::UpdateCartItem, Currency, Customer, CustomerUpdate, ShoppingCart};
+use crate::models::{
+    cart_item::{InternalCartItem, UpdateCartItem},
+    Currency, Customer, CustomerUpdate, ShoppingCart,
+};
 
 pub type BazaarSchema = Schema<QueryRoot, MutationRoot, EmptySubscription>;
 
@@ -120,12 +123,32 @@ impl MutationRoot {
         &self,
         ctx: &Context<'_>,
         id: Uuid,
-        updated_items: Vec<UpdateCartItem>,
+        new_items: Vec<UpdateCartItem>,
     ) -> Result<ShoppingCart> {
         let pool = ctx.data::<PgPool>()?;
-        ShoppingCart::add_items_to_cart(
+        ShoppingCart::edit_cart_items(id, new_items.into_iter().map(|i| i.into()).collect(), pool)
+            .await
+            .map_err(|e| async_graphql::Error::new(e.message))
+    }
+
+    #[tracing::instrument(skip(self, ctx))]
+    async fn remove_items_from_cart(
+        &self,
+        ctx: &Context<'_>,
+        id: Uuid,
+        removed_items: Vec<UpdateCartItem>,
+    ) -> Result<ShoppingCart> {
+        let pool = ctx.data::<PgPool>()?;
+        ShoppingCart::edit_cart_items(
             id,
-            updated_items.into_iter().map(|i| i.into()).collect(),
+            removed_items
+                .into_iter()
+                .map(|i| {
+                    let mut item: InternalCartItem = i.into();
+                    item.quantity = -item.quantity;
+                    item
+                })
+                .collect(),
             pool,
         )
         .await

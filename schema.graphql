@@ -56,7 +56,8 @@ type MutationRoot {
 	updateCustomer(id: UUID!, update: CustomerUpdate!): Customer!
 	createAnonymousCart(currency: Currency!): ShoppingCart!
 	createKnownCart(id: UUID!, currency: Currency!): ShoppingCart!
-	addItemsToCart(id: UUID!, updatedItems: [UpdateCartItem!]!): ShoppingCart!
+	addItemsToCart(id: UUID!, newItems: [UpdateCartItem!]!): ShoppingCart!
+	removeItemsFromCart(id: UUID!, removedItems: [UpdateCartItem!]!): ShoppingCart!
 }
 input CustomerUpdate {
 email: String!

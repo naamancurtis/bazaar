@@ -8,7 +8,7 @@ mod helpers;
 
 use helpers::*;
 
-use bazaar::models::{Customer, ShoppingCart};
+use bazaar::models::{cart_item::InternalCartItem, Customer, ShoppingCart};
 
 const CUSTOMER_GRAPHQL_FIELDS: &str = "#
 id,
@@ -382,8 +382,8 @@ async fn mutation_add_item_to_cart_works() -> Result<()> {
 
     let graphql_mutatation = format!(
         r#"
-        mutation addItemsToCart($id: UUID!, $updatedItems: [UpdateCartItem!]!) {{
-            addItemsToCart(id: $id, updatedItems: $updatedItems) {{
+        mutation addItemsToCart($id: UUID!, $newItems: [UpdateCartItem!]!) {{
+            addItemsToCart(id: $id, newItems: $newItems) {{
                 {}
             }}
         }}
@@ -395,7 +395,7 @@ async fn mutation_add_item_to_cart_works() -> Result<()> {
         "query": graphql_mutatation,
         "variables": {
             "id": ids.cart.unwrap(),
-            "updatedItems": [{
+            "newItems": [{
                 "sku": "12345678",
                 "quantity": 3
             }]
@@ -431,5 +431,162 @@ async fn mutation_add_item_to_cart_works() -> Result<()> {
     dbg!(&cart);
     assert_eq!(cart.items.len(), 1);
     assert_on_decimal(cart.price_before_discounts, 2.97);
+    Ok(())
+}
+
+#[actix_rt::test]
+async fn mutation_remove_item_from_cart_completely_removes_negative_quantities() -> Result<()> {
+    let app = spawn_app().await;
+    let client = reqwest::Client::new();
+
+    let ids = insert_default_customer_with_cart(&app.db_pool).await?;
+    let cart = ShoppingCart::edit_cart_items(
+        ids.cart.unwrap(),
+        vec![InternalCartItem {
+            sku: "12345678".to_string(),
+            quantity: 1,
+        }],
+        &app.db_pool,
+    )
+    .await
+    .expect("should find shopping cart");
+    assert!(!cart.items.is_empty());
+    assert!(cart.price_before_discounts > 0f64);
+
+    let graphql_mutatation = format!(
+        r#"
+        mutation removeItemsFromCart($id: UUID!, $removedItems: [UpdateCartItem!]!) {{
+            removeItemsFromCart(id: $id, removedItems: $removedItems) {{
+                {}
+            }}
+        }}
+    "#,
+        SHOPPING_CART_GRAPHQL_FIELDS
+    );
+
+    // This update would actually set the quantity to -2
+    let body = json!({
+        "query": graphql_mutatation,
+        "variables": {
+            "id": ids.cart.unwrap(),
+            "removedItems": [{
+                "sku": "12345678",
+                "quantity": 3
+            }]
+        }
+    });
+
+    dbg!(&body);
+    let response = client.post(&app.address).json(&body).send().await?;
+    let data = response.json::<serde_json::Value>().await?["data"]["removeItemsFromCart"].clone();
+    dbg!(&data);
+
+    assert_json_include!(
+        actual: &data,
+        expected: json!({
+            "id": ids.cart,
+            "currency": "GBP",
+            "cartType": "KNOWN",
+            "items": [],
+            "priceBeforeDiscounts": 0.0,
+            "priceAfterDiscounts": 0.0
+        })
+    );
+
+    let cart = ShoppingCart::find_by_id(ids.cart.unwrap(), &app.db_pool)
+        .await
+        .expect("should be able to fetch cart");
+    dbg!(&cart);
+    assert!(cart.items.is_empty());
+    assert!(cart.price_after_discounts == 0f64);
+    Ok(())
+}
+
+#[actix_rt::test]
+async fn mutation_remove_items_from_cart_correctly() -> Result<()> {
+    let app = spawn_app().await;
+    let client = reqwest::Client::new();
+
+    let ids = insert_default_customer_with_cart(&app.db_pool).await?;
+    let cart = ShoppingCart::edit_cart_items(
+        ids.cart.unwrap(),
+        vec![
+            InternalCartItem {
+                sku: "12345678".to_string(),
+                quantity: 5,
+            },
+            InternalCartItem {
+                sku: "22345678".to_string(),
+                quantity: 2,
+            },
+        ],
+        &app.db_pool,
+    )
+    .await
+    .expect("should find shopping cart");
+    dbg!(&cart);
+    assert_eq!(cart.items.len(), 2);
+    assert!(cart.price_before_discounts > 22.98);
+
+    let graphql_mutatation = format!(
+        r#"
+        mutation removeItemsFromCart($id: UUID!, $removedItems: [UpdateCartItem!]!) {{
+            removeItemsFromCart(id: $id, removedItems: $removedItems) {{
+                {}
+            }}
+        }}
+    "#,
+        SHOPPING_CART_GRAPHQL_FIELDS
+    );
+
+    let body = json!({
+        "query": graphql_mutatation,
+        "variables": {
+            "id": ids.cart.unwrap(),
+            "removedItems": [{
+                "sku": "12345678",
+                "quantity": 3
+            }]
+        }
+    });
+
+    dbg!(&body);
+    let response = client.post(&app.address).json(&body).send().await?;
+    let data = response.json::<serde_json::Value>().await?["data"]["removeItemsFromCart"].clone();
+    dbg!(&data);
+
+    assert_json_include!(
+        actual: &data,
+        expected: json!({
+            "id": ids.cart,
+            "currency": "GBP",
+            "cartType": "KNOWN",
+            "items": [
+                {
+                    "sku": "12345678",
+                    "quantity": 2,
+                    "name": "Item 1",
+                    "tags": []
+                },
+                {
+                    "sku": "22345678",
+                    "quantity": 2,
+                    "name": "Item 2",
+                    "tags": []
+                }
+            ],
+        })
+    );
+    assert_on_decimal(data["priceBeforeDiscounts"].as_f64().unwrap(), 22.98);
+    assert_on_decimal(data["priceAfterDiscounts"].as_f64().unwrap(), 22.98);
+    assert_on_decimal(data["items"][0]["pricePerUnit"].as_f64().unwrap(), 0.99);
+    assert_on_decimal(data["items"][1]["pricePerUnit"].as_f64().unwrap(), 10.50);
+
+    let cart = ShoppingCart::find_by_id(ids.cart.unwrap(), &app.db_pool)
+        .await
+        .expect("should be able to fetch cart");
+    dbg!(&cart);
+    assert_eq!(cart.items.len(), 2);
+    assert!(cart.price_before_discounts < 23.0);
     Ok(())
 }

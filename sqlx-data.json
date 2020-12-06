@@ -400,56 +400,6 @@
       ]
     }
   },
-  "7237643dc4f4f3585df320e9cf55abef51e376f2338b6461ce53f6361a5f23c6": {
-    "query": "SELECT * FROM items WHERE sku IN ($1) ORDER BY sku ASC",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "sku",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 1,
-          "name": "price",
-          "type_info": "Float8"
-        },
-        {
-          "ordinal": 2,
-          "name": "name",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 3,
-          "name": "description",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 4,
-          "name": "img_src",
-          "type_info": "Varchar"
-        },
-        {
-          "ordinal": 5,
-          "name": "tags",
-          "type_info": "VarcharArray"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
   "72e26076d306addf3b1180ffb5b426f3a3aad18c5a8b0168c0ee6bec8ad57eca": {
     "query": "\n            SELECT * FROM customers WHERE email = $1;\n            ",
     "describe": {
@@ -503,6 +453,56 @@
         false,
         false,
         true
+      ]
+    }
+  },
+  "74aed6fb59eb0ccda1d2ff17a3f1d87e84994971a1e6345c9256506e6078f439": {
+    "query": "SELECT * FROM items WHERE sku = ANY ($1) ORDER BY sku ASC",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "sku",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 1,
+          "name": "price",
+          "type_info": "Float8"
+        },
+        {
+          "ordinal": 2,
+          "name": "name",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 3,
+          "name": "description",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 4,
+          "name": "img_src",
+          "type_info": "Varchar"
+        },
+        {
+          "ordinal": 5,
+          "name": "tags",
+          "type_info": "VarcharArray"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "TextArray"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false,
+        false,
+        false,
+        false
       ]
     }
   },

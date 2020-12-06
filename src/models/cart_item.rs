@@ -27,14 +27,12 @@ impl CartItem {
         internal_items: &[InternalCartItem],
         pool: &PgPool,
     ) -> Result<Vec<CartItem>> {
-        tracing::warn!(?internal_items);
         let items = match query!(
-            "SELECT * FROM items WHERE sku IN ($1) ORDER BY sku ASC",
-            internal_items
+            "SELECT * FROM items WHERE sku = ANY ($1) ORDER BY sku ASC",
+            &internal_items
                 .iter()
                 .map(|i| i.sku.clone())
                 .collect::<Vec<String>>()
-                .join(", ")
         )
         .fetch_all(pool)
         .await

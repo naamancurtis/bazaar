@@ -105,7 +105,8 @@ impl ShoppingCart {
         ShoppingCart::new(id, Some(customer_id), CartType::Known, currency, pool).await
     }
 
-    pub async fn add_items_to_cart(
+    #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
+    pub async fn edit_cart_items(
         cart_id: Uuid,
         items: Vec<InternalCartItem>,
         pool: &PgPool,
@@ -160,7 +161,9 @@ impl ShoppingCart {
                 Some(old_item) => old_item + item,
                 None => item,
             };
-            item_set.insert(updated_item);
+            if updated_item.quantity > 0 {
+                item_set.insert(updated_item);
+            }
         }
         self.items = item_set.into_iter().collect::<Vec<InternalCartItem>>();
     }
