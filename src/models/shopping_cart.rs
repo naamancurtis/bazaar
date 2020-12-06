@@ -4,7 +4,7 @@ use serde::Deserialize;
 use sqlx::{query_as, types::Json, PgPool};
 use std::collections::HashSet;
 use std::iter::FromIterator;
-use tracing::debug;
+use tracing::{debug, error};
 use uuid::Uuid;
 
 use crate::models::{cart_item::InternalCartItem, CartItem, Currency};
@@ -47,7 +47,7 @@ struct SqlxShoppingCart {
 
 impl ShoppingCart {
     #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
-    pub async fn find_by_id(id: Uuid, pool: &PgPool) -> Result<Option<Self>> {
+    pub async fn find_by_id(id: Uuid, pool: &PgPool) -> Result<Self> {
         let cart = query_as!(
             SqlxShoppingCart,
             r#"
@@ -62,11 +62,10 @@ impl ShoppingCart {
             "#,
             id
         )
-        .fetch_optional(pool)
-        .await?
-        .map(|cart| cart.into());
+        .fetch_one(pool)
+        .await?;
 
-        Ok(cart)
+        Ok(cart.into())
     }
 
     #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
@@ -106,21 +105,13 @@ impl ShoppingCart {
         ShoppingCart::new(id, Some(customer_id), CartType::Known, currency, pool).await
     }
 
-    pub async fn add_item_to_cart(
-        customer_id: Uuid,
-        item: InternalCartItem,
+    pub async fn add_items_to_cart(
+        cart_id: Uuid,
+        items: Vec<InternalCartItem>,
         pool: &PgPool,
     ) -> Result<Self> {
-        let mut cart = Self::find_by_customer_id(customer_id, pool).await?;
-        let mut current_cart_items = Vec::new();
-        std::mem::swap(&mut cart.items, &mut current_cart_items);
-        let mut items: HashSet<InternalCartItem> = HashSet::from_iter(current_cart_items);
-        let updated_item = match items.take(&item) {
-            Some(old_item) => old_item + item,
-            None => item,
-        };
-        items.insert(updated_item);
-        cart.items = items.into_iter().collect::<Vec<InternalCartItem>>();
+        let mut cart = Self::find_by_id(cart_id, pool).await?;
+        cart.update_items_in_cart(items);
         cart.update_cart(pool).await
     }
 }
@@ -157,6 +148,21 @@ impl ShoppingCart {
         .await?;
 
         Ok(cart.into())
+    }
+
+    #[tracing::instrument(fields(model = "ShoppingCart"))]
+    fn update_items_in_cart(&mut self, items: Vec<InternalCartItem>) {
+        let mut current_cart_items = Vec::new();
+        std::mem::swap(&mut self.items, &mut current_cart_items);
+        let mut item_set: HashSet<InternalCartItem> = HashSet::from_iter(current_cart_items);
+        for item in items {
+            let updated_item = match item_set.take(&item) {
+                Some(old_item) => old_item + item,
+                None => item,
+            };
+            item_set.insert(updated_item);
+        }
+        self.items = item_set.into_iter().collect::<Vec<InternalCartItem>>();
     }
 
     #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
@@ -197,7 +203,7 @@ impl ShoppingCart {
         {
             Ok(cart) => cart,
             Err(e) => {
-                tracing::error!(?e);
+                error!(?e);
                 return Err(e.into());
             }
         };

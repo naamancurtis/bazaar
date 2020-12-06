@@ -1,7 +1,8 @@
 use async_graphql::{InputObject, Result, SimpleObject};
-use serde::{Serialize, Deserialize};
+use serde::{Deserialize, Serialize};
 use sqlx::{query, PgPool};
 use std::hash::{Hash, Hasher};
+use tracing::error;
 
 #[derive(Debug, SimpleObject, Deserialize, Clone)]
 pub struct CartItem {
@@ -14,8 +15,8 @@ pub struct CartItem {
     pub tags: Vec<String>,
 }
 
-#[derive(Debug, InputObject, Deserialize, Clone)]
-pub struct AddCartItem {
+#[derive(Debug, InputObject, Serialize, Deserialize, Clone)]
+pub struct UpdateCartItem {
     pub sku: String,
     pub quantity: u32,
 }
@@ -26,7 +27,8 @@ impl CartItem {
         internal_items: &[InternalCartItem],
         pool: &PgPool,
     ) -> Result<Vec<CartItem>> {
-        let items = query!(
+        tracing::warn!(?internal_items);
+        let items = match query!(
             "SELECT * FROM items WHERE sku IN ($1) ORDER BY sku ASC",
             internal_items
                 .iter()
@@ -35,7 +37,14 @@ impl CartItem {
                 .join(", ")
         )
         .fetch_all(pool)
-        .await?;
+        .await
+        {
+            Ok(items) => items,
+            Err(e) => {
+                error!(?e);
+                return Err(e.into());
+            }
+        };
 
         let mut internal_items = internal_items.to_vec();
         internal_items.sort_by(|a, b| a.sku.cmp(&b.sku));
@@ -94,8 +103,8 @@ impl From<(String, i32)> for InternalCartItem {
     }
 }
 
-impl From<AddCartItem> for InternalCartItem {
-    fn from(item: AddCartItem) -> Self {
+impl From<UpdateCartItem> for InternalCartItem {
+    fn from(item: UpdateCartItem) -> Self {
         Self {
             sku: item.sku,
             quantity: item.quantity as i32,

@@ -120,10 +120,7 @@ impl Customer {
     #[tracing::instrument(skip(pool), fields(model = "Customer"))]
     pub async fn add_new_cart(id: Uuid, currency: Currency, pool: &PgPool) -> Result<ShoppingCart> {
         if let Some(cart_id) = Customer::check_cart(id, pool).await {
-            let cart = ShoppingCart::find_by_id(cart_id, pool).await?;
-            if let Some(cart) = cart {
-                return Ok(cart);
-            }
+            return ShoppingCart::find_by_id(cart_id, pool).await;
         }
         let cart_id = Uuid::new_v4();
 
@@ -201,11 +198,7 @@ impl Customer {
     async fn cart(&self, ctx: &Context<'_>) -> Option<ShoppingCart> {
         let pool = ctx.data::<PgPool>().ok()?;
         if let Some(cart_id) = self.cart_id {
-            return match ShoppingCart::find_by_id(cart_id, pool).await {
-                Ok(Some(cart)) => Some(cart),
-                Ok(None) => None,
-                Err(_) => None,
-            };
+            return ShoppingCart::find_by_id(cart_id, pool).await.ok();
         }
         None
     }

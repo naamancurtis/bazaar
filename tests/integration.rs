@@ -8,7 +8,7 @@ mod helpers;
 
 use helpers::*;
 
-use bazaar::models::Customer;
+use bazaar::models::{Customer, ShoppingCart};
 
 const CUSTOMER_GRAPHQL_FIELDS: &str = "#
 id,
@@ -24,6 +24,10 @@ id
 cartType
 items {
    sku 
+   quantity
+   pricePerUnit
+   name
+   tags
 }
 priceBeforeDiscounts
 discounts
@@ -366,5 +370,66 @@ async fn mutation_create_known_cart_doesnt_recreate_existing_cart() -> Result<()
         Uuid::parse_str(&data["id"].as_str().expect("Cart should always have an ID"))
             .expect("cart id should be valid UUID")
     );
+    Ok(())
+}
+
+#[actix_rt::test]
+async fn mutation_add_item_to_cart_works() -> Result<()> {
+    let app = spawn_app().await;
+    let client = reqwest::Client::new();
+
+    let ids = insert_default_customer_with_cart(&app.db_pool).await?;
+
+    let graphql_mutatation = format!(
+        r#"
+        mutation addItemsToCart($id: UUID!, $updatedItems: [UpdateCartItem!]!) {{
+            addItemsToCart(id: $id, updatedItems: $updatedItems) {{
+                {}
+            }}
+        }}
+    "#,
+        SHOPPING_CART_GRAPHQL_FIELDS
+    );
+
+    let body = json!({
+        "query": graphql_mutatation,
+        "variables": {
+            "id": ids.cart.unwrap(),
+            "updatedItems": [{
+                "sku": "12345678",
+                "quantity": 3
+            }]
+        }
+    });
+
+    dbg!(&body);
+    let response = client.post(&app.address).json(&body).send().await?;
+    let data = response.json::<serde_json::Value>().await?["data"]["addItemsToCart"].clone();
+    dbg!(&data);
+
+    assert_json_include!(
+        actual: &data,
+        expected: json!({
+            "id": ids.cart,
+            "currency": "GBP",
+            "cartType": "KNOWN",
+            "items": [{
+                "sku": "12345678",
+                "quantity": 3,
+                "name": "Item 1",
+                "tags": []
+            }],
+        })
+    );
+    assert_on_decimal(data["priceBeforeDiscounts"].as_f64().unwrap(), 2.97);
+    assert_on_decimal(data["priceAfterDiscounts"].as_f64().unwrap(), 2.97);
+    assert_on_decimal(data["items"][0]["pricePerUnit"].as_f64().unwrap(), 0.99);
+
+    let cart = ShoppingCart::find_by_id(ids.cart.unwrap(), &app.db_pool)
+        .await
+        .expect("should be able to fetch cart");
+    dbg!(&cart);
+    assert_eq!(cart.items.len(), 1);
+    assert_on_decimal(cart.price_before_discounts, 2.97);
     Ok(())
 }

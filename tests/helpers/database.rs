@@ -25,6 +25,10 @@ pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
         .run(&pool)
         .await
         .expect("failed to run database migrations");
+    sqlx::query_file!("scripts/seed_items.sql")
+        .execute(&pool)
+        .await
+        .expect("failed to seed test database");
     pool
 }
 
