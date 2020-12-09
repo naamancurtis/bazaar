@@ -1,4 +1,7 @@
+pub mod auth;
 pub mod configuration;
+pub mod database;
+mod error;
 mod graphql;
 pub mod models;
 pub mod routes;

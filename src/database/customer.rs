@@ -1,0 +1,196 @@
+use anyhow::Result;
+use async_trait::async_trait;
+use sqlx::{query, query_as, PgPool};
+use uuid::Uuid;
+
+use crate::{
+    database::ShoppingCartDatabase,
+    models::{Currency, Customer, CustomerUpdate, ShoppingCart},
+};
+
+#[async_trait]
+pub trait CustomerRepository {
+    async fn create_new_user(
+        public_id: Uuid,
+        id: Uuid,
+        email: &str,
+        password_hash: &str,
+        first_name: &str,
+        last_name: &str,
+        pool: &PgPool,
+    ) -> Result<()>;
+    async fn find_all(pool: &PgPool) -> Result<Vec<Customer>>;
+    async fn find_by_id(id: Uuid, pool: &PgPool) -> Result<Customer>;
+    async fn find_by_email(email: String, pool: &PgPool) -> Result<Customer>;
+    async fn check_cart(id: Uuid, pool: &PgPool) -> Option<Uuid>;
+    async fn update(id: Uuid, update: CustomerUpdate, pool: &PgPool) -> Result<Customer>;
+    async fn add_new_cart(
+        customer_id: Uuid,
+        cart_id: Uuid,
+        currency: Currency,
+        pool: &PgPool,
+    ) -> Result<ShoppingCart>;
+}
+
+pub struct CustomerDatabase;
+
+#[async_trait]
+impl CustomerRepository for CustomerDatabase {
+    #[tracing::instrument(skip(pool), fields(repository = "customer"))]
+    async fn find_all(pool: &PgPool) -> Result<Vec<Customer>> {
+        let customer = query_as!(
+            Customer,
+            r#"
+            SELECT * FROM customers
+            "#
+        )
+        .fetch_all(pool)
+        .await?;
+        Ok(customer)
+    }
+
+    #[tracing::instrument(skip(pool), fields(repository = "customer"))]
+    async fn find_by_id(id: Uuid, pool: &PgPool) -> Result<Customer> {
+        let customer = query_as!(
+            Customer,
+            r#"
+            SELECT * FROM customers WHERE id = $1
+            "#,
+            id
+        )
+        .fetch_one(pool)
+        .await?;
+        Ok(customer)
+    }
+
+    #[tracing::instrument(skip(pool), fields(repository = "customer"))]
+    async fn find_by_email(email: String, pool: &PgPool) -> Result<Customer> {
+        let customer = query_as!(
+            Customer,
+            r#"
+            SELECT * FROM customers WHERE email = $1;
+            "#,
+            email
+        )
+        .fetch_one(pool)
+        .await?;
+        Ok(customer)
+    }
+
+    #[tracing::instrument(skip(pool, password_hash), fields(repository = "customer"))]
+    async fn create_new_user(
+        public_id: Uuid,
+        id: Uuid,
+        email: &str,
+        password_hash: &str,
+        first_name: &str,
+        last_name: &str,
+        pool: &PgPool,
+    ) -> Result<()> {
+        let mut tx = pool.begin().await?;
+
+        query!(
+            r#"
+            INSERT INTO auth (public_id, id, password_hash)
+            VALUES ($1, $2, $3)
+        "#,
+            public_id,
+            id,
+            password_hash
+        )
+        .fetch_one(&mut tx)
+        .await?;
+
+        query!(
+            r#"
+            INSERT INTO customers ( id, email, first_name, last_name )
+            VALUES ( $1, $2, $3, $4 )
+            "#,
+            id,
+            email,
+            first_name,
+            last_name,
+        )
+        .fetch_one(&mut tx)
+        .await?;
+
+        tx.commit().await?;
+        Ok(())
+    }
+
+    #[tracing::instrument(skip(pool), fields(repository = "customer"))]
+    async fn update(id: Uuid, update: CustomerUpdate, pool: &PgPool) -> Result<Customer> {
+        let updated_customer = query_as!(
+            Customer,
+            r#"
+            UPDATE customers
+            SET email = $1, first_name = $2, last_name = $3
+            WHERE id = $4
+            RETURNING *;
+            "#,
+            update.email,
+            update.first_name,
+            update.last_name,
+            id
+        )
+        .fetch_one(pool)
+        .await?;
+        Ok(updated_customer)
+    }
+
+    #[tracing::instrument(skip(pool), fields(repository = "customer"))]
+    async fn add_new_cart(
+        customer_id: Uuid,
+        cart_id: Uuid,
+        currency: Currency,
+        pool: &PgPool,
+    ) -> Result<ShoppingCart> {
+        use futures::future::join;
+
+        let cloned_pool = pool.clone();
+        let updated_customer_future = tokio::spawn(async move {
+            query!(
+                r#"
+            UPDATE customers
+            SET cart_id = $1
+            WHERE id = $2;
+            "#,
+                cart_id,
+                customer_id
+            )
+            .fetch_one(&cloned_pool)
+            .await
+        });
+        let cloned_pool = pool.clone();
+        let new_cart_future = tokio::spawn(async move {
+            ShoppingCart::new_known::<ShoppingCartDatabase>(
+                cart_id,
+                customer_id,
+                currency,
+                &cloned_pool,
+            )
+            .await
+        });
+
+        let (_, cart) = join(updated_customer_future, new_cart_future).await;
+        cart?
+    }
+
+    #[tracing::instrument(skip(pool), fields(repository = "customer"))]
+    async fn check_cart(id: Uuid, pool: &PgPool) -> Option<Uuid> {
+        if let Some(result) = query!(
+            r#"
+            SELECT cart_id FROM customers WHERE id = $1
+            "#,
+            id
+        )
+        .fetch_optional(pool)
+        .await
+        .ok()
+        .flatten()
+        {
+            return result.cart_id;
+        }
+        None
+    }
+}

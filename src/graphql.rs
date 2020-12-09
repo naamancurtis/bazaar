@@ -1,13 +1,14 @@
 use async_graphql::{
     validators::{Email, StringMinLength},
-    Context, EmptySubscription, Object, Result, Schema,
+    Context, EmptySubscription, Error, Object, Result, Schema,
 };
 use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::models::{
-    cart_item::{InternalCartItem, UpdateCartItem},
-    Currency, Customer, CustomerUpdate, ShoppingCart,
+use crate::{
+    database::{CartItemDatabase, CustomerDatabase, ShoppingCartDatabase},
+    error::generate_error_log,
+    models::{cart_item::UpdateCartItem, Currency, Customer, CustomerUpdate, ShoppingCart},
 };
 
 pub type BazaarSchema = Schema<QueryRoot, MutationRoot, EmptySubscription>;
@@ -19,27 +20,23 @@ impl QueryRoot {
     #[tracing::instrument(name = "get_customers", skip(self, ctx))]
     async fn customers(&self, ctx: &Context<'_>) -> Result<Vec<Customer>> {
         let pool = ctx.data::<PgPool>()?;
-        match Customer::find_all(pool).await {
-            Ok(customers) => Ok(customers),
-            // @TODO improve error handling
-            Err(e) => Err(async_graphql::Error::new(format!(
-                "Message: {}, extensions: {:?}",
-                e.message, e.extensions
-            ))),
-        }
+        Customer::find_all::<CustomerDatabase>(pool)
+            .await
+            .map_err(|err| {
+                generate_error_log(err, None);
+                Error::new("unable to fetch customers")
+            })
     }
 
     #[tracing::instrument(skip(self, ctx))]
-    async fn customer_by_id(&self, ctx: &Context<'_>, id: Uuid) -> Result<Option<Customer>> {
+    async fn customer_by_id(&self, ctx: &Context<'_>, id: Uuid) -> Result<Customer> {
         let pool = ctx.data::<PgPool>()?;
-        match Customer::find_by_id(id, pool).await {
-            Ok(customer) => Ok(customer),
-            // @TODO improve error handling
-            Err(e) => Err(async_graphql::Error::new(format!(
-                "Message: {}, extensions: {:?}",
-                e.message, e.extensions
-            ))),
-        }
+        Customer::find_by_id::<CustomerDatabase>(id, pool)
+            .await
+            .map_err(|err| {
+                generate_error_log(err, None);
+                Error::new("unable to find customer")
+            })
     }
 
     #[tracing::instrument(skip(self, ctx))]
@@ -47,16 +44,25 @@ impl QueryRoot {
         &self,
         ctx: &Context<'_>,
         #[graphql(validator(Email))] email: String,
-    ) -> Result<Option<Customer>> {
+    ) -> Result<Customer> {
         let pool = ctx.data::<PgPool>()?;
-        match Customer::find_by_email(email, pool).await {
-            Ok(customer) => Ok(customer),
-            // @TODO improve error handling
-            Err(e) => Err(async_graphql::Error::new(format!(
-                "Message: {}, extensions: {:?}",
-                e.message, e.extensions
-            ))),
-        }
+        Customer::find_by_email::<CustomerDatabase>(email, pool)
+            .await
+            .map_err(|err| {
+                generate_error_log(err, None);
+                Error::new("unable to find customer")
+            })
+    }
+
+    #[tracing::instrument(skip(self, ctx))]
+    async fn cart_by_id(&self, ctx: &Context<'_>, id: Uuid) -> Result<ShoppingCart> {
+        let pool = ctx.data::<PgPool>()?;
+        ShoppingCart::find_by_id::<ShoppingCartDatabase>(id, pool)
+            .await
+            .map_err(|err| {
+                generate_error_log(err, None);
+                Error::new("unable to find cart")
+            })
     }
 }
 
@@ -71,13 +77,17 @@ impl MutationRoot {
         &self,
         ctx: &Context<'_>,
         #[graphql(validator(Email))] email: String,
+        #[graphql(validator(StringMinLength(length = "8")))] password: String,
         #[graphql(validator(StringMinLength(length = "2")))] first_name: String,
         #[graphql(validator(StringMinLength(length = "2")))] last_name: String,
-    ) -> Result<Customer> {
+    ) -> Result<Uuid> {
         let pool = ctx.data::<PgPool>()?;
-        Customer::new(email, first_name, last_name, pool)
+        Customer::new::<CustomerDatabase>(email, password, first_name, last_name, pool)
             .await
-            .map_err(|e| async_graphql::Error::new(e.message))
+            .map_err(|err| {
+                generate_error_log(err, None);
+                Error::new("unable to create new customer")
+            })
     }
 
     #[tracing::instrument(skip(self, ctx))]
@@ -88,9 +98,12 @@ impl MutationRoot {
         update: CustomerUpdate,
     ) -> Result<Customer> {
         let pool = ctx.data::<PgPool>()?;
-        Customer::update(id, update, pool)
+        Customer::update::<CustomerDatabase>(id, update, pool)
             .await
-            .map_err(|e| async_graphql::Error::new(e.message))
+            .map_err(|err| {
+                generate_error_log(err, None);
+                Error::new("unable to update new customer")
+            })
     }
 
     #[tracing::instrument(skip(self, ctx))]
@@ -100,9 +113,12 @@ impl MutationRoot {
         currency: Currency,
     ) -> Result<ShoppingCart> {
         let pool = ctx.data::<PgPool>()?;
-        ShoppingCart::new_anonymous(currency, pool)
+        ShoppingCart::new_anonymous::<ShoppingCartDatabase>(currency, pool)
             .await
-            .map_err(|e| async_graphql::Error::new(e.message))
+            .map_err(|err| {
+                generate_error_log(err, None);
+                Error::new("unable to create cart")
+            })
     }
 
     #[tracing::instrument(skip(self, ctx))]
@@ -113,9 +129,12 @@ impl MutationRoot {
         currency: Currency,
     ) -> Result<ShoppingCart> {
         let pool = ctx.data::<PgPool>()?;
-        Customer::add_new_cart(id, currency, pool)
+        Customer::add_new_cart::<CustomerDatabase, ShoppingCartDatabase>(id, currency, pool)
             .await
-            .map_err(|e| async_graphql::Error::new(e.message))
+            .map_err(|err| {
+                generate_error_log(err, None);
+                Error::new("unable to create cart for customer")
+            })
     }
 
     #[tracing::instrument(skip(self, ctx))]
@@ -126,9 +145,12 @@ impl MutationRoot {
         new_items: Vec<UpdateCartItem>,
     ) -> Result<ShoppingCart> {
         let pool = ctx.data::<PgPool>()?;
-        ShoppingCart::edit_cart_items(id, new_items.into_iter().map(|i| i.into()).collect(), pool)
+        ShoppingCart::edit_cart_items::<ShoppingCartDatabase, CartItemDatabase>(id, new_items, pool)
             .await
-            .map_err(|e| async_graphql::Error::new(e.message))
+            .map_err(|err| {
+                generate_error_log(err, None);
+                Error::new("unable to add items to cart")
+            })
     }
 
     #[tracing::instrument(skip(self, ctx))]
@@ -139,19 +161,15 @@ impl MutationRoot {
         removed_items: Vec<UpdateCartItem>,
     ) -> Result<ShoppingCart> {
         let pool = ctx.data::<PgPool>()?;
-        ShoppingCart::edit_cart_items(
+        ShoppingCart::edit_cart_items::<ShoppingCartDatabase, CartItemDatabase>(
             id,
-            removed_items
-                .into_iter()
-                .map(|i| {
-                    let mut item: InternalCartItem = i.into();
-                    item.quantity = -item.quantity;
-                    item
-                })
-                .collect(),
+            removed_items,
             pool,
         )
         .await
-        .map_err(|e| async_graphql::Error::new(e.message))
+        .map_err(|err| {
+            generate_error_log(err, None);
+            Error::new("unable to remove items from cart")
+        })
     }
 }

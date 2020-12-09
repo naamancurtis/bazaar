@@ -94,65 +94,6 @@
       ]
     }
   },
-  "237a6d14341ea9db48aa647d1c9501db46cbbe05223b6086950ca1aa78de5e2e": {
-    "query": "\n            INSERT INTO customers ( id, email, first_name, last_name )\n            VALUES ( $1, $2, $3, $4 )\n            RETURNING *;\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "email",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "first_name",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "last_name",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 4,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 5,
-          "name": "last_modified",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 6,
-          "name": "cart_id",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Text",
-          "Text",
-          "Text"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true
-      ]
-    }
-  },
   "3cfcc6ae1e35b0f4b3c0410b8ee5a56e6a88de8eeb91e7d431f49e69341e1759": {
     "query": "\n            UPDATE shopping_carts\n            SET price_before_discounts = $1, price_after_discounts = $2, items = $3::jsonb\n            WHERE id = $4\n            RETURNING \n                id, customer_id, \n                cart_type as \"cart_type!: CartType\", \n                items as \"items!: Json<Vec<InternalCartItem>>\",\n                currency as \"currency!: Currency\",\n                discounts, price_before_discounts, price_after_discounts,\n                created_at, last_modified\n            ",
     "describe": {
@@ -306,6 +247,26 @@
       ]
     }
   },
+  "62b40b2e35fcbefdda5a92f0e995e27135cca092b6e7380505af1d0984d36d22": {
+    "query": "\n            SELECT password_hash FROM auth WHERE public_id = $1\n        ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "password_hash",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "669ec0fcffd6c612382111059e1ca39056c94f3b67d4ad902e9ce87083dec552": {
     "query": "\n            SELECT\n                id, customer_id,\n                cart_type as \"cart_type!: CartType\", \n                items as \"items!: Json<Vec<InternalCartItem>>\",\n                currency as \"currency!: Currency\",\n                discounts, price_before_discounts, price_after_discounts,\n                created_at, last_modified\n            FROM shopping_carts WHERE customer_id = $1\n            ",
     "describe": {
@@ -454,6 +415,20 @@
         false,
         true
       ]
+    }
+  },
+  "738b62ddb898e382403250f597908591338d082fe14cb788ddbc8b3921ea8ce6": {
+    "query": "\n            INSERT INTO auth (public_id, id, password_hash)\n            VALUES ($1, $2, $3)\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Uuid",
+          "Text"
+        ]
+      },
+      "nullable": []
     }
   },
   "74aed6fb59eb0ccda1d2ff17a3f1d87e84994971a1e6345c9256506e6078f439": {
@@ -700,6 +675,21 @@
         false,
         true
       ]
+    }
+  },
+  "bcea3bb7c7a9ca03aae6c5940802c07aa9576bfd21653cb2ad467a09eb68e86e": {
+    "query": "\n            INSERT INTO customers ( id, email, first_name, last_name )\n            VALUES ( $1, $2, $3, $4 )\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Text",
+          "Text",
+          "Text"
+        ]
+      },
+      "nullable": []
     }
   },
   "dba04fb90d6770fe4e38f818a71cda0341b9194ca6d6bd62f8745a8811bb11e0": {

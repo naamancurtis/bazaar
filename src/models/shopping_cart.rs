@@ -1,13 +1,20 @@
-use async_graphql::{Context, Object, Result};
+use anyhow::Result;
+use async_graphql::{Context, Object};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
-use sqlx::{query_as, types::Json, PgPool};
+use sqlx::{types::Json, PgPool};
 use std::collections::HashSet;
 use std::iter::FromIterator;
-use tracing::{debug, error};
+use tracing::debug;
 use uuid::Uuid;
 
-use crate::models::{cart_item::InternalCartItem, CartItem, Currency};
+use crate::{
+    database::{CartItemDatabase, CartItemRepository, ShoppingCartRepository},
+    models::{
+        cart_item::{InternalCartItem, UpdateCartItem},
+        CartItem, Currency,
+    },
+};
 
 #[derive(Debug, async_graphql::Enum, Copy, Clone, Eq, PartialEq, Deserialize, sqlx::Type)]
 #[sqlx(rename = "user_cart_type", rename_all = "UPPERCASE")]
@@ -32,7 +39,7 @@ pub struct ShoppingCart {
     pub last_modified: DateTime<Utc>,
 }
 
-struct SqlxShoppingCart {
+pub(crate) struct SqlxShoppingCart {
     pub id: Uuid,
     pub customer_id: Option<Uuid>,
     pub cart_type: CartType,
@@ -47,108 +54,68 @@ struct SqlxShoppingCart {
 
 impl ShoppingCart {
     #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
-    pub async fn find_by_id(id: Uuid, pool: &PgPool) -> Result<Self> {
-        let cart = query_as!(
-            SqlxShoppingCart,
-            r#"
-            SELECT
-                id, customer_id,
-                cart_type as "cart_type!: CartType", 
-                items as "items!: Json<Vec<InternalCartItem>>",
-                currency as "currency!: Currency",
-                discounts, price_before_discounts, price_after_discounts,
-                created_at, last_modified
-            FROM shopping_carts WHERE id = $1
-            "#,
-            id
-        )
-        .fetch_one(pool)
-        .await?;
-
-        Ok(cart.into())
+    pub async fn find_by_id<DB: ShoppingCartRepository>(id: Uuid, pool: &PgPool) -> Result<Self> {
+        DB::find_by_id(id, pool).await
     }
 
     #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
-    pub async fn find_by_customer_id(customer_id: Uuid, pool: &PgPool) -> Result<Self> {
-        let cart = query_as!(
-            SqlxShoppingCart,
-            r#"
-            SELECT
-                id, customer_id,
-                cart_type as "cart_type!: CartType", 
-                items as "items!: Json<Vec<InternalCartItem>>",
-                currency as "currency!: Currency",
-                discounts, price_before_discounts, price_after_discounts,
-                created_at, last_modified
-            FROM shopping_carts WHERE customer_id = $1
-            "#,
-            customer_id
-        )
-        .fetch_one(pool)
-        .await?;
-
-        Ok(cart.into())
+    pub async fn find_by_customer_id<DB: ShoppingCartRepository>(
+        customer_id: Uuid,
+        pool: &PgPool,
+    ) -> Result<Self> {
+        DB::find_by_customer_id(customer_id, pool).await
     }
 
     #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
-    pub async fn new_anonymous(currency: Currency, pool: &PgPool) -> Result<Self> {
-        ShoppingCart::new(Uuid::new_v4(), None, CartType::Anonymous, currency, pool).await
+    pub async fn new_anonymous<DB: ShoppingCartRepository>(
+        currency: Currency,
+        pool: &PgPool,
+    ) -> Result<Self> {
+        ShoppingCart::new::<DB>(Uuid::new_v4(), None, CartType::Anonymous, currency, pool).await
     }
 
     #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
-    pub async fn new_known(
+    pub async fn new_known<DB: ShoppingCartRepository>(
         id: Uuid,
         customer_id: Uuid,
         currency: Currency,
         pool: &PgPool,
     ) -> Result<Self> {
-        ShoppingCart::new(id, Some(customer_id), CartType::Known, currency, pool).await
+        ShoppingCart::new::<DB>(id, Some(customer_id), CartType::Known, currency, pool).await
     }
 
     #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
-    pub async fn edit_cart_items(
+    pub async fn edit_cart_items<DB: ShoppingCartRepository, CI: CartItemRepository>(
         cart_id: Uuid,
-        items: Vec<InternalCartItem>,
+        items: Vec<UpdateCartItem>,
         pool: &PgPool,
     ) -> Result<Self> {
-        let mut cart = Self::find_by_id(cart_id, pool).await?;
-        cart.update_items_in_cart(items);
-        cart.update_cart(pool).await
+        let mut cart = Self::find_by_id::<DB>(cart_id, pool).await?;
+        cart.update_items_in_cart(
+            items
+                .into_iter()
+                .map(|i| {
+                    let mut item: InternalCartItem = i.into();
+                    item.quantity = -item.quantity;
+                    item
+                })
+                .collect(),
+        );
+        cart.update_cart::<DB, CI>(pool).await
     }
 }
 
 /// Private API
 impl ShoppingCart {
     #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
-    async fn new(
+    async fn new<DB: ShoppingCartRepository>(
         id: Uuid,
         customer_id: Option<Uuid>,
         cart_type: CartType,
         currency: Currency,
         pool: &PgPool,
     ) -> Result<Self> {
-        let cart = query_as!(
-            SqlxShoppingCart,
-            r#"
-            INSERT INTO shopping_carts (id, customer_id, cart_type, currency)
-            VALUES ( $1, $2, $3, $4)
-            RETURNING
-                id, customer_id, 
-                cart_type as "cart_type!: CartType", 
-                items as "items!: Json<Vec<InternalCartItem>>",
-                currency as "currency!: Currency",
-                discounts, price_before_discounts, price_after_discounts,
-                created_at, last_modified
-            "#,
-            id,
-            customer_id,
-            cart_type as CartType,
-            currency as Currency
-        )
-        .fetch_one(pool)
-        .await?;
-
-        Ok(cart.into())
+        DB::create_new_cart(id, customer_id, cart_type, currency, pool).await
     }
 
     #[tracing::instrument(fields(model = "ShoppingCart"))]
@@ -169,8 +136,11 @@ impl ShoppingCart {
     }
 
     #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
-    async fn update_cart(&mut self, pool: &PgPool) -> Result<Self> {
-        let cart_items = CartItem::find_multiple(&self.items, pool).await?;
+    async fn update_cart<SC: ShoppingCartRepository, CI: CartItemRepository>(
+        &mut self,
+        pool: &PgPool,
+    ) -> Result<Self> {
+        let cart_items = CartItem::find_multiple::<CI>(&self.items, pool).await?;
         self.price_before_discounts = cart_items.iter().fold(0f64, |mut acc, item| {
             acc += item.price_per_unit * item.quantity as f64;
             acc
@@ -182,36 +152,7 @@ impl ShoppingCart {
         // is for 0.5 release)
         let items_array = serde_json::to_value(&self.items)?;
         debug!(?items_array, "json stringified the items to update");
-        let cart = match query_as!(
-            SqlxShoppingCart,
-            r#"
-            UPDATE shopping_carts
-            SET price_before_discounts = $1, price_after_discounts = $2, items = $3::jsonb
-            WHERE id = $4
-            RETURNING 
-                id, customer_id, 
-                cart_type as "cart_type!: CartType", 
-                items as "items!: Json<Vec<InternalCartItem>>",
-                currency as "currency!: Currency",
-                discounts, price_before_discounts, price_after_discounts,
-                created_at, last_modified
-            "#,
-            self.price_before_discounts,
-            self.price_after_discounts,
-            items_array,
-            self.id
-        )
-        .fetch_one(pool)
-        .await
-        {
-            Ok(cart) => cart,
-            Err(e) => {
-                error!(?e);
-                return Err(e.into());
-            }
-        };
-
-        Ok(cart.into())
+        SC::update_cart(&self, items_array, pool).await
     }
 }
 
@@ -277,7 +218,7 @@ impl ShoppingCart {
             return Vec::new();
         }
         if let Ok(pool) = ctx.data::<PgPool>() {
-            let items = CartItem::find_multiple(&self.items, pool)
+            let items = CartItem::find_multiple::<CartItemDatabase>(&self.items, pool)
                 .await
                 .expect("error occurred while trying to find cart items");
             return items;
