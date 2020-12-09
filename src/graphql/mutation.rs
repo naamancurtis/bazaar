@@ -1,6 +1,6 @@
 use async_graphql::{
     validators::{Email, StringMinLength},
-    Context, EmptySubscription, Error, Object, Result, Schema,
+    Context, Error, Object, Result,
 };
 use sqlx::PgPool;
 use uuid::Uuid;
@@ -8,63 +8,9 @@ use uuid::Uuid;
 use crate::{
     database::{CartItemDatabase, CustomerDatabase, ShoppingCartDatabase},
     error::generate_error_log,
+    graphql::validators::ValidCustomerUpdateType,
     models::{cart_item::UpdateCartItem, Currency, Customer, CustomerUpdate, ShoppingCart},
 };
-
-pub type BazaarSchema = Schema<QueryRoot, MutationRoot, EmptySubscription>;
-
-pub struct QueryRoot;
-
-#[Object]
-impl QueryRoot {
-    #[tracing::instrument(name = "get_customers", skip(self, ctx))]
-    async fn customers(&self, ctx: &Context<'_>) -> Result<Vec<Customer>> {
-        let pool = ctx.data::<PgPool>()?;
-        Customer::find_all::<CustomerDatabase>(pool)
-            .await
-            .map_err(|err| {
-                generate_error_log(err, None);
-                Error::new("unable to fetch customers")
-            })
-    }
-
-    #[tracing::instrument(skip(self, ctx))]
-    async fn customer_by_id(&self, ctx: &Context<'_>, id: Uuid) -> Result<Customer> {
-        let pool = ctx.data::<PgPool>()?;
-        Customer::find_by_id::<CustomerDatabase>(id, pool)
-            .await
-            .map_err(|err| {
-                generate_error_log(err, None);
-                Error::new("unable to find customer")
-            })
-    }
-
-    #[tracing::instrument(skip(self, ctx))]
-    async fn customer_by_email(
-        &self,
-        ctx: &Context<'_>,
-        #[graphql(validator(Email))] email: String,
-    ) -> Result<Customer> {
-        let pool = ctx.data::<PgPool>()?;
-        Customer::find_by_email::<CustomerDatabase>(email, pool)
-            .await
-            .map_err(|err| {
-                generate_error_log(err, None);
-                Error::new("unable to find customer")
-            })
-    }
-
-    #[tracing::instrument(skip(self, ctx))]
-    async fn cart_by_id(&self, ctx: &Context<'_>, id: Uuid) -> Result<ShoppingCart> {
-        let pool = ctx.data::<PgPool>()?;
-        ShoppingCart::find_by_id::<ShoppingCartDatabase>(id, pool)
-            .await
-            .map_err(|err| {
-                generate_error_log(err, None);
-                Error::new("unable to find cart")
-            })
-    }
-}
 
 pub struct MutationRoot;
 
@@ -95,7 +41,7 @@ impl MutationRoot {
         &self,
         ctx: &Context<'_>,
         id: Uuid,
-        update: Vec<CustomerUpdate>,
+        #[graphql(validator(ValidCustomerUpdateType))] update: Vec<CustomerUpdate>,
     ) -> Result<Customer> {
         let pool = ctx.data::<PgPool>()?;
         Customer::update::<CustomerDatabase>(id, update, pool)

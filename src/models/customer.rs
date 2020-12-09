@@ -1,5 +1,5 @@
 use anyhow::Result;
-use async_graphql::{Context, Enum, InputObject, Object};
+use async_graphql::{Context, InputObject, Object};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use sqlx::PgPool;
