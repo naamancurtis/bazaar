@@ -1,8 +1,5 @@
 use anyhow::Result;
-use async_graphql::{
-    validators::{Email, StringMinLength},
-    Context, InputObject, Object,
-};
+use async_graphql::{Context, Enum, InputObject, Object};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -26,14 +23,10 @@ pub struct Customer {
     pub cart_id: Option<Uuid>,
 }
 
-#[derive(InputObject, Debug)]
+#[derive(InputObject, Debug, Deserialize)]
 pub struct CustomerUpdate {
-    #[graphql(validator(Email))]
-    pub email: String,
-    #[graphql(validator(StringMinLength(length = "2")))]
-    pub first_name: String,
-    #[graphql(validator(StringMinLength(length = "2")))]
-    pub last_name: String,
+    pub key: String,
+    pub value: String,
 }
 
 impl Customer {
@@ -83,10 +76,11 @@ impl Customer {
     #[tracing::instrument(skip(pool), fields(model = "Customer"))]
     pub async fn update<DB: CustomerRepository>(
         id: Uuid,
-        update: CustomerUpdate,
+        update: Vec<CustomerUpdate>,
         pool: &PgPool,
     ) -> Result<Self> {
-        DB::update(id, update, pool).await
+        DB::update(id, update, pool).await?;
+        DB::find_by_id(id, pool).await
     }
 
     #[tracing::instrument(skip(pool), fields(model = "Customer"))]

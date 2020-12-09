@@ -618,65 +618,6 @@
       ]
     }
   },
-  "ba487bad58a085b0c95ed3cb98e1c4b7558309367b3478f689c38cf1a1fa08a1": {
-    "query": "\n            UPDATE customers\n            SET email = $1, first_name = $2, last_name = $3\n            WHERE id = $4\n            RETURNING *;\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "id",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "email",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 2,
-          "name": "first_name",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 3,
-          "name": "last_name",
-          "type_info": "Text"
-        },
-        {
-          "ordinal": 4,
-          "name": "created_at",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 5,
-          "name": "last_modified",
-          "type_info": "Timestamptz"
-        },
-        {
-          "ordinal": 6,
-          "name": "cart_id",
-          "type_info": "Uuid"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text",
-          "Text",
-          "Text",
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        false,
-        false,
-        false,
-        false,
-        false,
-        false,
-        true
-      ]
-    }
-  },
   "bcea3bb7c7a9ca03aae6c5940802c07aa9576bfd21653cb2ad467a09eb68e86e": {
     "query": "\n            INSERT INTO customers ( id, email, first_name, last_name )\n            VALUES ( $1, $2, $3, $4 )\n            ",
     "describe": {

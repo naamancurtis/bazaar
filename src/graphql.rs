@@ -95,7 +95,7 @@ impl MutationRoot {
         &self,
         ctx: &Context<'_>,
         id: Uuid,
-        update: CustomerUpdate,
+        update: Vec<CustomerUpdate>,
     ) -> Result<Customer> {
         let pool = ctx.data::<PgPool>()?;
         Customer::update::<CustomerDatabase>(id, update, pool)

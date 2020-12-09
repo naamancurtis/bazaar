@@ -1,6 +1,7 @@
 use anyhow::Result;
 use async_trait::async_trait;
 use sqlx::{query, query_as, PgPool};
+use tracing::error;
 use uuid::Uuid;
 
 use crate::{
@@ -23,7 +24,7 @@ pub trait CustomerRepository {
     async fn find_by_id(id: Uuid, pool: &PgPool) -> Result<Customer>;
     async fn find_by_email(email: String, pool: &PgPool) -> Result<Customer>;
     async fn check_cart(id: Uuid, pool: &PgPool) -> Option<Uuid>;
-    async fn update(id: Uuid, update: CustomerUpdate, pool: &PgPool) -> Result<Customer>;
+    async fn update(id: Uuid, update: Vec<CustomerUpdate>, pool: &PgPool) -> Result<()>;
     async fn add_new_cart(
         customer_id: Uuid,
         cart_id: Uuid,
@@ -119,23 +120,35 @@ impl CustomerRepository for CustomerDatabase {
     }
 
     #[tracing::instrument(skip(pool), fields(repository = "customer"))]
-    async fn update(id: Uuid, update: CustomerUpdate, pool: &PgPool) -> Result<Customer> {
-        let updated_customer = query_as!(
-            Customer,
-            r#"
-            UPDATE customers
-            SET email = $1, first_name = $2, last_name = $3
-            WHERE id = $4
-            RETURNING *;
-            "#,
-            update.email,
-            update.first_name,
-            update.last_name,
-            id
-        )
-        .fetch_one(pool)
-        .await?;
-        Ok(updated_customer)
+    async fn update(id: Uuid, update: Vec<CustomerUpdate>, pool: &PgPool) -> Result<()> {
+        let mut tx = pool.begin().await?;
+        let updates: Vec<(&str, String)> = update
+            .into_iter()
+            .filter_map(|update| {
+                if let Some(query) = match update.key.to_lowercase().as_str() {
+                    "firstName" => Some("UPDATE customers SET first_name = $1 WHERE id = $2"),
+                    "lastName" => Some("UPDATE customers SET last_name = $1 WHERE id = $2"),
+                    "email" => Some("UPDATE customers SET email = $1 WHERE id = $2"),
+                    err => {
+                        error!(key = err, "customer attempted to update key; {}", err);
+                        None
+                    }
+                } {
+                    return Some((query, update.value));
+                }
+                None
+            })
+            .collect();
+
+        for (query, value) in updates {
+            sqlx::query(query)
+                .bind(value)
+                .bind(id)
+                .execute(&mut tx)
+                .await?;
+        }
+        tx.commit().await?;
+        Ok(())
     }
 
     #[tracing::instrument(skip(pool), fields(repository = "customer"))]

@@ -54,16 +54,15 @@ type CartItem {
 }
 type MutationRoot {
 	createCustomer(email: String!, password: String!, firstName: String!, lastName: String!): UUID!
-	updateCustomer(id: UUID!, update: CustomerUpdate!): Customer!
+	updateCustomer(id: UUID!, update: [CustomerUpdate!]!): Customer!
 	createAnonymousCart(currency: Currency!): ShoppingCart!
 	createKnownCart(id: UUID!, currency: Currency!): ShoppingCart!
 	addItemsToCart(id: UUID!, newItems: [UpdateCartItem!]!): ShoppingCart!
 	removeItemsFromCart(id: UUID!, removedItems: [UpdateCartItem!]!): ShoppingCart!
 }
 input CustomerUpdate {
-email: String!
-firstName: String!
-lastName: String!
+key: String!
+value: String!
 }
 input UpdateCartItem {
 sku: String!
