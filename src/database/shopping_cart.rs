@@ -51,7 +51,6 @@ impl ShoppingCartRepository for ShoppingCartDatabase {
         .await?;
         Ok(cart.into())
     }
-
     async fn find_by_customer_id(id: Uuid, pool: &PgPool) -> Result<ShoppingCart> {
         let cart = query_as!(
             SqlxShoppingCart,

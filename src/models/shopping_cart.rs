@@ -84,7 +84,7 @@ impl ShoppingCart {
     #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
     pub async fn edit_cart_items<DB: ShoppingCartRepository, CI: CartItemRepository>(
         cart_id: Uuid,
-        items: Vec<InternalCartItem>,
+        items: Vec<UpdateCartItem>,
         pool: &PgPool,
     ) -> Result<Self> {
         let mut cart = Self::find_by_id::<DB>(cart_id, pool).await?;
