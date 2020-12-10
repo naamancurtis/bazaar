@@ -2,6 +2,7 @@ use anyhow::Result;
 use argon2::{self, Config, ThreadMode, Variant, Version};
 use lazy_static::lazy_static;
 use std::env::var;
+use tracing::warn;
 
 lazy_static! {
     pub static ref SECRET_KEY: String = var("SECRET_KEY").expect("no secret key found");
@@ -39,7 +40,9 @@ lazy_static! {
 }
 
 pub fn hash_password(password: &str) -> Result<String> {
+    warn!("attempting to hash password now");
     let hash = argon2::hash_encoded(password.as_bytes(), SALT.as_bytes(), &CONFIG)?;
+    warn!("returning hashed pw now");
     Ok(hash)
 }
 

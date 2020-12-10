@@ -259,51 +259,6 @@ async fn mutation_create_known_cart_doesnt_recreate_existing_cart() -> Result<()
 }
 
 #[actix_rt::test]
-async fn query_find_cart_by_id_works() -> Result<()> {
-    let app = spawn_app().await;
-    let client = reqwest::Client::new();
-
-    let ids = insert_default_customer_with_cart(&app.db_pool).await?;
-
-    let graphql_mutatation = format!(
-        r#"
-        query cartById($id: UUID!) {{
-            cartById(id: $id) {{
-                {}
-            }}
-        }}
-    "#,
-        SHOPPING_CART_GRAPHQL_FIELDS
-    );
-
-    let body = json!({
-        "query": graphql_mutatation,
-        "variables": {
-            "id": ids.cart.unwrap(),
-        }
-    });
-
-    dbg!(&body);
-    let response = client.post(&app.address).json(&body).send().await?;
-    let data = response.json::<serde_json::Value>().await?["data"]["cartById"].clone();
-    dbg!(&data);
-
-    assert_json_include!(
-        actual: &data,
-        expected: json!({
-            "id": ids.cart,
-            "currency": "GBP",
-            "cartType": "KNOWN",
-            "priceBeforeDiscounts": 0.0,
-            "priceAfterDiscounts": 0.0,
-            "items": [],
-        })
-    );
-
-    Ok(())
-}
-
-#[actix_rt::test]
 async fn mutation_add_item_to_cart_works() -> Result<()> {
     let app = spawn_app().await;
     let client = reqwest::Client::new();
@@ -533,8 +488,9 @@ async fn mutation_remove_item_from_cart_completely_removes_negative_quantities()
         }],
         &app.db_pool,
     )
-    .await
-    .expect("should find shopping cart");
+    .await?;
+    dbg!(&cart);
+
     assert!(!cart.items.is_empty());
     assert!(cart.price_before_discounts > 0f64);
 
@@ -561,13 +517,12 @@ async fn mutation_remove_item_from_cart_completely_removes_negative_quantities()
         }
     });
 
-    dbg!(&body);
     let response = client.post(&app.address).json(&body).send().await?;
-    let data = response.json::<serde_json::Value>().await?["data"]["removeItemsFromCart"].clone();
-    dbg!(&data);
+    let data = parse_graphql_response(response).await?;
+    let cart = &data["removeItemsFromCart"];
 
     assert_json_include!(
-        actual: &data,
+        actual: &cart,
         expected: json!({
             "id": ids.cart,
             "currency": "GBP",
@@ -578,9 +533,8 @@ async fn mutation_remove_item_from_cart_completely_removes_negative_quantities()
         })
     );
 
-    let cart = ShoppingCart::find_by_id(ids.cart.unwrap(), &app.db_pool)
-        .await
-        .expect("should be able to fetch cart");
+    let cart =
+        ShoppingCart::find_by_id::<ShoppingCartDatabase>(ids.cart.unwrap(), &app.db_pool).await?;
     dbg!(&cart);
     assert!(cart.items.is_empty());
     assert!(cart.price_after_discounts == 0f64);
@@ -593,7 +547,7 @@ async fn mutation_remove_items_from_cart_correctly() -> Result<()> {
     let client = reqwest::Client::new();
 
     let ids = insert_default_customer_with_cart(&app.db_pool).await?;
-    let cart = ShoppingCart::edit_cart_items(
+    let cart = ShoppingCart::edit_cart_items::<ShoppingCartDatabase, CartItemDatabase>(
         ids.cart.unwrap(),
         vec![
             InternalCartItem {
@@ -635,13 +589,12 @@ async fn mutation_remove_items_from_cart_correctly() -> Result<()> {
         }
     });
 
-    dbg!(&body);
     let response = client.post(&app.address).json(&body).send().await?;
-    let data = response.json::<serde_json::Value>().await?["data"]["removeItemsFromCart"].clone();
-    dbg!(&data);
+    let data = parse_graphql_response(response).await?;
+    let cart = &data["removeItemsFromCart"];
 
     assert_json_include!(
-        actual: &data,
+        actual: &cart,
         expected: json!({
             "id": ids.cart,
             "currency": "GBP",
@@ -662,12 +615,12 @@ async fn mutation_remove_items_from_cart_correctly() -> Result<()> {
             ],
         })
     );
-    assert_on_decimal(data["priceBeforeDiscounts"].as_f64().unwrap(), 22.98);
-    assert_on_decimal(data["priceAfterDiscounts"].as_f64().unwrap(), 22.98);
-    assert_on_decimal(data["items"][0]["pricePerUnit"].as_f64().unwrap(), 0.99);
-    assert_on_decimal(data["items"][1]["pricePerUnit"].as_f64().unwrap(), 10.50);
+    assert_on_decimal(cart["priceBeforeDiscounts"].as_f64().unwrap(), 22.98);
+    assert_on_decimal(cart["priceAfterDiscounts"].as_f64().unwrap(), 22.98);
+    assert_on_decimal(cart["items"][0]["pricePerUnit"].as_f64().unwrap(), 0.99);
+    assert_on_decimal(cart["items"][1]["pricePerUnit"].as_f64().unwrap(), 10.50);
 
-    let cart = ShoppingCart::find_by_id(ids.cart.unwrap(), &app.db_pool)
+    let cart = ShoppingCart::find_by_id::<ShoppingCartDatabase>(ids.cart.unwrap(), &app.db_pool)
         .await
         .expect("should be able to fetch cart");
     dbg!(&cart);
