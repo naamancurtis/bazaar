@@ -99,7 +99,7 @@ impl CustomerRepository for CustomerDatabase {
             id,
             password_hash
         )
-        .fetch_one(&mut tx)
+        .execute(&mut tx)
         .await?;
 
         query!(
@@ -112,7 +112,7 @@ impl CustomerRepository for CustomerDatabase {
             first_name,
             last_name,
         )
-        .fetch_one(&mut tx)
+        .execute(&mut tx)
         .await?;
 
         tx.commit().await?;
@@ -126,11 +126,15 @@ impl CustomerRepository for CustomerDatabase {
             .into_iter()
             .filter_map(|update| {
                 if let Some(query) = match update.key.to_lowercase().as_str() {
-                    "firstName" => Some("UPDATE customers SET first_name = $1 WHERE id = $2"),
-                    "lastName" => Some("UPDATE customers SET last_name = $1 WHERE id = $2"),
+                    "firstname" => Some("UPDATE customers SET first_name = $1 WHERE id = $2"),
+                    "lastname" => Some("UPDATE customers SET last_name = $1 WHERE id = $2"),
                     "email" => Some("UPDATE customers SET email = $1 WHERE id = $2"),
                     err => {
-                        error!(key = err, "customer attempted to update key; {}", err);
+                        error!(
+                            key = err,
+                            "customer attempted to update key: '{}' but it's not a valid update",
+                            err
+                        );
                         None
                     }
                 } {

@@ -4,54 +4,13 @@ use chrono::DateTime;
 use serde_json::json;
 use uuid::Uuid;
 
+use bazaar::{
+    database::{CartItemDatabase, CustomerDatabase, ShoppingCartDatabase},
+    models::{cart_item::InternalCartItem, Customer, ShoppingCart},
+};
+
 mod helpers;
-
 use helpers::*;
-
-use bazaar::models::{cart_item::InternalCartItem, Customer, ShoppingCart};
-
-const CUSTOMER_GRAPHQL_FIELDS: &str = "#
-id,
-firstName,
-lastName,
-email,
-createdAt,
-lastModified
-#";
-
-const SHOPPING_CART_GRAPHQL_FIELDS: &str = "#
-id
-cartType
-items {
-   sku 
-   quantity
-   pricePerUnit
-   name
-   tags
-}
-priceBeforeDiscounts
-discounts
-priceAfterDiscounts
-currency
-lastModified
-createdAt
-#";
-
-#[actix_rt::test]
-async fn health_check_works() {
-    let app = spawn_app().await;
-
-    let client = reqwest::Client::new();
-
-    let response = client
-        .get(&format!("{}/health_check", &app.address))
-        .send()
-        .await
-        .expect("failed to execute request");
-
-    assert!(response.status().is_success());
-    assert_eq!(Some(0), response.content_length());
-}
 
 #[actix_rt::test]
 async fn mutation_create_customer_works() -> Result<()> {
@@ -60,8 +19,8 @@ async fn mutation_create_customer_works() -> Result<()> {
 
     let graphql_mutatation = format!(
         r#"
-        mutation createCustomer($email: String!, $firstName: String!, $lastName: String!) {{
-            createCustomer(email: $email, firstName: $firstName, lastName: $lastName) {{
+        mutation createCustomer($email: String!, $password: String!, $firstName: String!, $lastName: String!) {{
+            createCustomer(email: $email, password: $password, firstName: $firstName, lastName: $lastName) {{
                 {}
             }}
         }}
@@ -78,93 +37,23 @@ async fn mutation_create_customer_works() -> Result<()> {
         "variables": {
             "email": email,
             "firstName": first_name,
-            "lastName": last_name
+            "lastName": last_name,
+            "password": Uuid::nil()
         }
     });
-    dbg!(&body);
 
     let response = client.post(&app.address).json(&body).send().await?;
-    let data = response.json::<serde_json::Value>().await?["data"]["createCustomer"].clone();
+    let data = parse_graphql_response(response).await?;
+    let customer = &data["createCustomer"];
 
     assert_json_include!(
-        actual: data,
+        actual: customer,
         expected: json!({
             "email": email,
             "firstName": first_name,
             "lastName": last_name,
         })
     );
-    Ok(())
-}
-
-#[actix_rt::test]
-async fn query_customer_by_id_works() -> Result<()> {
-    let app = spawn_app().await;
-    let client = reqwest::Client::new();
-
-    let customer_id = insert_default_customer(&app.db_pool)
-        .await?
-        .customer
-        .unwrap();
-
-    let graphql_mutatation = format!(
-        r#"
-        query customerById($id: UUID!) {{
-            customerById(id: $id) {{
-                {}
-            }}
-        }}
-    "#,
-        CUSTOMER_GRAPHQL_FIELDS
-    );
-
-    let body = json!({
-        "query": graphql_mutatation,
-        "variables": {
-            "id": customer_id,
-        }
-    });
-
-    dbg!(&body);
-
-    let response = client.post(&app.address).json(&body).send().await?;
-    let data = response.json::<serde_json::Value>().await?["data"]["customerById"].clone();
-    assert_json_include!(actual: data, expected: DEFAULT_CUSTOMER.clone());
-    Ok(())
-}
-
-#[actix_rt::test]
-async fn query_customer_by_email_works() -> Result<(), Box<dyn std::error::Error>> {
-    let app = spawn_app().await;
-    let client = reqwest::Client::new();
-
-    insert_default_customer(&app.db_pool)
-        .await
-        .expect("default customer failed to be created");
-
-    let graphql_mutatation = format!(
-        r#"
-        query customerByEmail($email: String!) {{
-            customerByEmail(email: $email) {{
-                {}
-            }}
-        }}
-    "#,
-        CUSTOMER_GRAPHQL_FIELDS
-    );
-
-    let body = json!({
-        "query": graphql_mutatation,
-        "variables": {
-            "email": format!("{}@test.com", Uuid::nil()),
-        }
-    });
-
-    dbg!(&body);
-
-    let response = client.post(&app.address).json(&body).send().await?;
-    let data = response.json::<serde_json::Value>().await?["data"]["customerByEmail"].clone();
-    assert_json_include!(actual: data, expected: DEFAULT_CUSTOMER.clone());
     Ok(())
 }
 
@@ -180,7 +69,7 @@ async fn mutation_update_customer_works() -> Result<()> {
 
     let graphql_mutatation = format!(
         r#"
-        mutation updateCustomer($id: UUID!, $update: CustomerUpdate) {{
+        mutation updateCustomer($id: UUID!, $update: [CustomerUpdate!]!) {{
             updateCustomer(id: $id, update: $update) {{
                 {}
             }}
@@ -193,32 +82,33 @@ async fn mutation_update_customer_works() -> Result<()> {
         "query": graphql_mutatation,
         "variables": {
             "id": customer_id,
-            "update": {
-                "email": "updated@test.com",
-                "firstName": "updated",
-                "lastName": "updated"
-            }
+            "update": [{
+                "key": "email",
+                "value": "updated@test.com"
+            },{
+                "key": "firstName",
+                "value": "updated"
+            }]
         }
     });
 
-    dbg!(&body);
-
     let response = client.post(&app.address).json(&body).send().await?;
-    let data = response.json::<serde_json::Value>().await?["data"]["updateCustomer"].clone();
+    let data = parse_graphql_response(response).await?;
     dbg!(&data);
+    let customer = &data["updateCustomer"];
 
     assert_json_include!(
-        actual: &data,
+        actual: &customer,
         expected: json!({
             "firstName": "updated",
-            "lastName": "updated",
+            "lastName": Uuid::nil().to_string(),
             "email": "updated@test.com"
         })
     );
 
-    let last_modified = DateTime::parse_from_rfc3339(&data["lastModified"].as_str().unwrap())
+    let last_modified = DateTime::parse_from_rfc3339(&customer["lastModified"].as_str().unwrap())
         .expect("date should parse correctly with rfc3339");
-    let created_at = DateTime::parse_from_rfc3339(&data["createdAt"].as_str().unwrap())
+    let created_at = DateTime::parse_from_rfc3339(&customer["createdAt"].as_str().unwrap())
         .expect("date should parse correctly with rfc3339");
 
     assert!(last_modified > created_at);
@@ -251,9 +141,11 @@ async fn mutation_create_anonymous_cart_works() -> Result<()> {
     dbg!(&body);
 
     let response = client.post(&app.address).json(&body).send().await?;
-    let data = response.json::<serde_json::Value>().await?["data"]["createAnonymousCart"].clone();
+    let data = parse_graphql_response(response).await?;
+    let cart = &data["createAnonymousCart"];
+
     assert_json_include!(
-        actual: data,
+        actual: cart,
         expected: json!({
             "currency": "GBP",
             "cartType": "ANONYMOUS",
@@ -272,7 +164,7 @@ async fn mutation_create_known_cart_works() -> Result<()> {
     let customer = insert_default_customer(&app.db_pool)
         .await?
         .customer
-        .unwrap();
+        .expect("failed to create default customer");
 
     let graphql_mutatation = format!(
         r#"
@@ -293,12 +185,12 @@ async fn mutation_create_known_cart_works() -> Result<()> {
         }
     });
 
-    dbg!(&body);
     let response = client.post(&app.address).json(&body).send().await?;
-    dbg!(&response);
-    let data = response.json::<serde_json::Value>().await?["data"]["createKnownCart"].clone();
+    let data = parse_graphql_response(response).await?;
+    let cart = &data["createKnownCart"];
+
     assert_json_include!(
-        actual: &data,
+        actual: &cart,
         expected: json!({
             "currency": "GBP",
             "cartType": "KNOWN",
@@ -306,13 +198,10 @@ async fn mutation_create_known_cart_works() -> Result<()> {
         })
     );
 
-    let customer = Customer::find_by_id(customer, &app.db_pool)
-        .await
-        .expect("failed to query customer from the database")
-        .expect("failed to find customer");
+    let customer = Customer::find_by_id::<CustomerDatabase>(customer, &app.db_pool).await?;
     assert_eq!(
         customer.cart_id.expect("customer should have cart id"),
-        Uuid::parse_str(&data["id"].as_str().expect("Cart should always have an ID"))
+        Uuid::parse_str(&cart["id"].as_str().expect("Cart should always have an ID"))
             .expect("cart id should be valid UUID")
     );
     Ok(())
@@ -344,14 +233,12 @@ async fn mutation_create_known_cart_doesnt_recreate_existing_cart() -> Result<()
         }
     });
 
-    dbg!(&body);
-
     let response = client.post(&app.address).json(&body).send().await?;
+    let data = parse_graphql_response(response).await?;
+    let cart = &data["createKnownCart"];
 
-    dbg!(&response);
-    let data = response.json::<serde_json::Value>().await?["data"]["createKnownCart"].clone();
     assert_json_include!(
-        actual: &data,
+        actual: &cart,
         expected: json!({
             "id": ids.cart,
             "currency": "GBP",
@@ -360,61 +247,14 @@ async fn mutation_create_known_cart_doesnt_recreate_existing_cart() -> Result<()
         })
     );
 
-    let customer = Customer::find_by_id(ids.customer.unwrap(), &app.db_pool)
-        .await
-        .expect("failed to query customer from the database")
-        .expect("failed to find customer");
+    let customer =
+        Customer::find_by_id::<CustomerDatabase>(ids.customer.unwrap(), &app.db_pool).await?;
 
     assert_eq!(
         customer.cart_id.expect("customer should have cart id"),
-        Uuid::parse_str(&data["id"].as_str().expect("Cart should always have an ID"))
+        Uuid::parse_str(&cart["id"].as_str().expect("Cart should always have an ID"))
             .expect("cart id should be valid UUID")
     );
-    Ok(())
-}
-
-#[actix_rt::test]
-async fn query_find_cart_by_id_works() -> Result<()> {
-    let app = spawn_app().await;
-    let client = reqwest::Client::new();
-
-    let ids = insert_default_customer_with_cart(&app.db_pool).await?;
-
-    let graphql_mutatation = format!(
-        r#"
-        query cartById($id: UUID!) {{
-            cartById(id: $id) {{
-                {}
-            }}
-        }}
-    "#,
-        SHOPPING_CART_GRAPHQL_FIELDS
-    );
-
-    let body = json!({
-        "query": graphql_mutatation,
-        "variables": {
-            "id": ids.cart.unwrap(),
-        }
-    });
-
-    dbg!(&body);
-    let response = client.post(&app.address).json(&body).send().await?;
-    let data = response.json::<serde_json::Value>().await?["data"]["cartById"].clone();
-    dbg!(&data);
-
-    assert_json_include!(
-        actual: &data,
-        expected: json!({
-            "id": ids.cart,
-            "currency": "GBP",
-            "cartType": "KNOWN",
-            "priceBeforeDiscounts": 0.0,
-            "priceAfterDiscounts": 0.0,
-            "items": [],
-        })
-    );
-
     Ok(())
 }
 
@@ -447,13 +287,13 @@ async fn mutation_add_item_to_cart_works() -> Result<()> {
         }
     });
 
-    dbg!(&body);
     let response = client.post(&app.address).json(&body).send().await?;
-    let data = response.json::<serde_json::Value>().await?["data"]["addItemsToCart"].clone();
-    dbg!(&data);
+    let data = parse_graphql_response(response).await?;
+    let cart = &data["addItemsToCart"];
+    dbg!(&cart);
 
     assert_json_include!(
-        actual: &data,
+        actual: &cart,
         expected: json!({
             "id": ids.cart,
             "currency": "GBP",
@@ -466,11 +306,11 @@ async fn mutation_add_item_to_cart_works() -> Result<()> {
             }],
         })
     );
-    assert_on_decimal(data["priceBeforeDiscounts"].as_f64().unwrap(), 2.97);
-    assert_on_decimal(data["priceAfterDiscounts"].as_f64().unwrap(), 2.97);
-    assert_on_decimal(data["items"][0]["pricePerUnit"].as_f64().unwrap(), 0.99);
+    assert_on_decimal(cart["priceBeforeDiscounts"].as_f64().unwrap(), 2.97);
+    assert_on_decimal(cart["priceAfterDiscounts"].as_f64().unwrap(), 2.97);
+    assert_on_decimal(cart["items"][0]["pricePerUnit"].as_f64().unwrap(), 0.99);
 
-    let cart = ShoppingCart::find_by_id(ids.cart.unwrap(), &app.db_pool)
+    let cart = ShoppingCart::find_by_id::<ShoppingCartDatabase>(ids.cart.unwrap(), &app.db_pool)
         .await
         .expect("should be able to fetch cart");
     dbg!(&cart);
@@ -485,7 +325,7 @@ async fn mutation_remove_item_from_cart_completely_removes_negative_quantities()
     let client = reqwest::Client::new();
 
     let ids = insert_default_customer_with_cart(&app.db_pool).await?;
-    let cart = ShoppingCart::edit_cart_items(
+    let cart = ShoppingCart::edit_cart_items::<ShoppingCartDatabase, CartItemDatabase>(
         ids.cart.unwrap(),
         vec![InternalCartItem {
             sku: "12345678".to_string(),
@@ -493,8 +333,9 @@ async fn mutation_remove_item_from_cart_completely_removes_negative_quantities()
         }],
         &app.db_pool,
     )
-    .await
-    .expect("should find shopping cart");
+    .await?;
+    dbg!(&cart);
+
     assert!(!cart.items.is_empty());
     assert!(cart.price_before_discounts > 0f64);
 
@@ -521,13 +362,12 @@ async fn mutation_remove_item_from_cart_completely_removes_negative_quantities()
         }
     });
 
-    dbg!(&body);
     let response = client.post(&app.address).json(&body).send().await?;
-    let data = response.json::<serde_json::Value>().await?["data"]["removeItemsFromCart"].clone();
-    dbg!(&data);
+    let data = parse_graphql_response(response).await?;
+    let cart = &data["removeItemsFromCart"];
 
     assert_json_include!(
-        actual: &data,
+        actual: &cart,
         expected: json!({
             "id": ids.cart,
             "currency": "GBP",
@@ -538,9 +378,8 @@ async fn mutation_remove_item_from_cart_completely_removes_negative_quantities()
         })
     );
 
-    let cart = ShoppingCart::find_by_id(ids.cart.unwrap(), &app.db_pool)
-        .await
-        .expect("should be able to fetch cart");
+    let cart =
+        ShoppingCart::find_by_id::<ShoppingCartDatabase>(ids.cart.unwrap(), &app.db_pool).await?;
     dbg!(&cart);
     assert!(cart.items.is_empty());
     assert!(cart.price_after_discounts == 0f64);
@@ -553,7 +392,7 @@ async fn mutation_remove_items_from_cart_correctly() -> Result<()> {
     let client = reqwest::Client::new();
 
     let ids = insert_default_customer_with_cart(&app.db_pool).await?;
-    let cart = ShoppingCart::edit_cart_items(
+    let cart = ShoppingCart::edit_cart_items::<ShoppingCartDatabase, CartItemDatabase>(
         ids.cart.unwrap(),
         vec![
             InternalCartItem {
@@ -595,13 +434,12 @@ async fn mutation_remove_items_from_cart_correctly() -> Result<()> {
         }
     });
 
-    dbg!(&body);
     let response = client.post(&app.address).json(&body).send().await?;
-    let data = response.json::<serde_json::Value>().await?["data"]["removeItemsFromCart"].clone();
-    dbg!(&data);
+    let data = parse_graphql_response(response).await?;
+    let cart = &data["removeItemsFromCart"];
 
     assert_json_include!(
-        actual: &data,
+        actual: &cart,
         expected: json!({
             "id": ids.cart,
             "currency": "GBP",
@@ -622,12 +460,12 @@ async fn mutation_remove_items_from_cart_correctly() -> Result<()> {
             ],
         })
     );
-    assert_on_decimal(data["priceBeforeDiscounts"].as_f64().unwrap(), 22.98);
-    assert_on_decimal(data["priceAfterDiscounts"].as_f64().unwrap(), 22.98);
-    assert_on_decimal(data["items"][0]["pricePerUnit"].as_f64().unwrap(), 0.99);
-    assert_on_decimal(data["items"][1]["pricePerUnit"].as_f64().unwrap(), 10.50);
+    assert_on_decimal(cart["priceBeforeDiscounts"].as_f64().unwrap(), 22.98);
+    assert_on_decimal(cart["priceAfterDiscounts"].as_f64().unwrap(), 22.98);
+    assert_on_decimal(cart["items"][0]["pricePerUnit"].as_f64().unwrap(), 0.99);
+    assert_on_decimal(cart["items"][1]["pricePerUnit"].as_f64().unwrap(), 10.50);
 
-    let cart = ShoppingCart::find_by_id(ids.cart.unwrap(), &app.db_pool)
+    let cart = ShoppingCart::find_by_id::<ShoppingCartDatabase>(ids.cart.unwrap(), &app.db_pool)
         .await
         .expect("should be able to fetch cart");
     dbg!(&cart);

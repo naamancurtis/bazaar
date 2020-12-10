@@ -3,13 +3,17 @@ use async_graphql::{
     Context, Error, Object, Result,
 };
 use sqlx::PgPool;
+use tracing::error;
 use uuid::Uuid;
 
 use crate::{
     database::{CartItemDatabase, CustomerDatabase, ShoppingCartDatabase},
     error::generate_error_log,
     graphql::validators::ValidCustomerUpdateType,
-    models::{cart_item::UpdateCartItem, Currency, Customer, CustomerUpdate, ShoppingCart},
+    models::{
+        cart_item::{InternalCartItem, UpdateCartItem},
+        Currency, Customer, CustomerUpdate, ShoppingCart,
+    },
 };
 
 pub struct MutationRoot;
@@ -18,7 +22,7 @@ pub struct MutationRoot;
 impl MutationRoot {
     // @TODO - Once there's an auth token, we need to ensure that if the user has an
     // anonymous cart, it's correctly added when they're signing up
-    #[tracing::instrument(skip(self, ctx))]
+    #[tracing::instrument(skip(self, ctx, password))]
     async fn create_customer(
         &self,
         ctx: &Context<'_>,
@@ -26,13 +30,21 @@ impl MutationRoot {
         #[graphql(validator(StringMinLength(length = "8")))] password: String,
         #[graphql(validator(StringMinLength(length = "2")))] first_name: String,
         #[graphql(validator(StringMinLength(length = "2")))] last_name: String,
-    ) -> Result<Uuid> {
+    ) -> Result<Customer> {
         let pool = ctx.data::<PgPool>()?;
-        Customer::new::<CustomerDatabase>(email, password, first_name, last_name, pool)
+        let id = Customer::new::<CustomerDatabase>(email, password, first_name, last_name, pool)
             .await
             .map_err(|err| {
+                error!(?err, "create failed");
                 generate_error_log(err, None);
                 Error::new("unable to create new customer")
+            })?;
+        Customer::find_by_id::<CustomerDatabase>(id, pool)
+            .await
+            .map_err(|err| {
+                error!(?err, "find failed");
+                generate_error_log(err, None);
+                Error::new("unable to find new customer")
             })
     }
 
@@ -91,12 +103,16 @@ impl MutationRoot {
         new_items: Vec<UpdateCartItem>,
     ) -> Result<ShoppingCart> {
         let pool = ctx.data::<PgPool>()?;
-        ShoppingCart::edit_cart_items::<ShoppingCartDatabase, CartItemDatabase>(id, new_items, pool)
-            .await
-            .map_err(|err| {
-                generate_error_log(err, None);
-                Error::new("unable to add items to cart")
-            })
+        ShoppingCart::edit_cart_items::<ShoppingCartDatabase, CartItemDatabase>(
+            id,
+            new_items.into_iter().map(Into::into).collect(),
+            pool,
+        )
+        .await
+        .map_err(|err| {
+            generate_error_log(err, None);
+            Error::new("unable to add items to cart")
+        })
     }
 
     #[tracing::instrument(skip(self, ctx))]
@@ -109,7 +125,14 @@ impl MutationRoot {
         let pool = ctx.data::<PgPool>()?;
         ShoppingCart::edit_cart_items::<ShoppingCartDatabase, CartItemDatabase>(
             id,
-            removed_items,
+            removed_items
+                .into_iter()
+                .map(|i| {
+                    let mut item: InternalCartItem = i.into();
+                    item.quantity = -item.quantity;
+                    item
+                })
+                .collect(),
             pool,
         )
         .await

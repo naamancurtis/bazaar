@@ -10,10 +10,7 @@ use uuid::Uuid;
 
 use crate::{
     database::{CartItemDatabase, CartItemRepository, ShoppingCartRepository},
-    models::{
-        cart_item::{InternalCartItem, UpdateCartItem},
-        CartItem, Currency,
-    },
+    models::{cart_item::InternalCartItem, CartItem, Currency},
 };
 
 #[derive(Debug, async_graphql::Enum, Copy, Clone, Eq, PartialEq, Deserialize, sqlx::Type)]
@@ -87,20 +84,11 @@ impl ShoppingCart {
     #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
     pub async fn edit_cart_items<DB: ShoppingCartRepository, CI: CartItemRepository>(
         cart_id: Uuid,
-        items: Vec<UpdateCartItem>,
+        items: Vec<InternalCartItem>,
         pool: &PgPool,
     ) -> Result<Self> {
         let mut cart = Self::find_by_id::<DB>(cart_id, pool).await?;
-        cart.update_items_in_cart(
-            items
-                .into_iter()
-                .map(|i| {
-                    let mut item: InternalCartItem = i.into();
-                    item.quantity = -item.quantity;
-                    item
-                })
-                .collect(),
-        );
+        cart.update_items_in_cart(items);
         cart.update_cart::<DB, CI>(pool).await
     }
 }

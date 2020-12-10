@@ -1,5 +1,6 @@
 use anyhow::Result;
 use async_trait::async_trait;
+use serde_json::Value;
 use sqlx::{query_as, types::Json, PgPool};
 use uuid::Uuid;
 
@@ -50,6 +51,7 @@ impl ShoppingCartRepository for ShoppingCartDatabase {
         .await?;
         Ok(cart.into())
     }
+
     async fn find_by_customer_id(id: Uuid, pool: &PgPool) -> Result<ShoppingCart> {
         let cart = query_as!(
             SqlxShoppingCart,
@@ -99,9 +101,10 @@ impl ShoppingCartRepository for ShoppingCartDatabase {
         .await?;
         Ok(cart.into())
     }
+
     async fn update_cart(
         cart: &ShoppingCart,
-        items_array: serde_json::Value,
+        items_array: Value,
         pool: &PgPool,
     ) -> Result<ShoppingCart> {
         let cart = query_as!(

@@ -48,7 +48,11 @@ impl Customer {
         DB::find_by_email(email, pool).await
     }
 
-    #[tracing::instrument(skip(pool, password), fields(model = "Customer"))]
+    #[tracing::instrument(
+        name = "new_customer",
+        skip(pool, password),
+        fields(model = "Customer")
+    )]
     pub async fn new<DB: CustomerRepository>(
         email: String,
         password: String,
@@ -70,7 +74,7 @@ impl Customer {
             pool,
         )
         .await?;
-        Ok(public_id)
+        Ok(id)
     }
 
     #[tracing::instrument(skip(pool), fields(model = "Customer"))]
