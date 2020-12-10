@@ -1,11 +1,16 @@
+#![allow(dead_code)]
 mod app;
+mod constants;
 mod database;
+mod graphql;
 mod math;
 
 pub use app::{spawn_app, IdHolder, TestApp};
+pub use constants::*;
 pub use database::{
     configure_database, insert_default_customer, insert_default_customer_with_cart,
 };
+pub use graphql::parse_graphql_response;
 pub use math::assert_on_decimal;
 
 use lazy_static::lazy_static;

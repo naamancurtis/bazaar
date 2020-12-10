@@ -1,13 +1,15 @@
-use async_graphql::{
-    validators::{Email, StringMinLength},
-    Context, InputObject, Object, Result,
-};
+use anyhow::Result;
+use async_graphql::{Context, InputObject, Object};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
-use sqlx::{query, query_as, PgPool};
+use sqlx::PgPool;
 use uuid::Uuid;
 
-use crate::models::{Currency, ShoppingCart};
+use crate::{
+    auth,
+    database::{CustomerRepository, ShoppingCartDatabase, ShoppingCartRepository},
+    models::{Currency, ShoppingCart},
+};
 
 #[derive(Debug, Deserialize)]
 #[serde(rename_all(serialize = "snake_case", deserialize = "camelCase"))]
@@ -21,151 +23,89 @@ pub struct Customer {
     pub cart_id: Option<Uuid>,
 }
 
-#[derive(InputObject, Debug)]
+#[derive(InputObject, Debug, Deserialize)]
 pub struct CustomerUpdate {
-    #[graphql(validator(Email))]
-    pub email: String,
-    #[graphql(validator(StringMinLength(length = "2")))]
-    pub first_name: String,
-    #[graphql(validator(StringMinLength(length = "2")))]
-    pub last_name: String,
+    pub key: String,
+    pub value: String,
 }
 
 impl Customer {
     #[tracing::instrument(skip(pool), fields(model = "Customer"))]
-    pub async fn find_all(pool: &PgPool) -> Result<Vec<Self>> {
-        let customer = query_as!(
-            Customer,
-            r#"
-            SELECT * FROM customers
-            "#
-        )
-        .fetch_all(pool)
-        .await?;
-        Ok(customer)
+    pub async fn find_all<DB: CustomerRepository>(pool: &PgPool) -> Result<Vec<Self>> {
+        DB::find_all(pool).await
     }
 
     #[tracing::instrument(skip(pool), fields(model = "Customer"))]
-    pub async fn find_by_id(id: Uuid, pool: &PgPool) -> Result<Option<Self>> {
-        let customer = query_as!(
-            Customer,
-            r#"
-            SELECT * FROM customers WHERE id = $1
-            "#,
-            id
-        )
-        .fetch_optional(pool)
-        .await?;
-        Ok(customer)
+    pub async fn find_by_id<DB: CustomerRepository>(id: Uuid, pool: &PgPool) -> Result<Self> {
+        DB::find_by_id(id, pool).await
     }
 
     #[tracing::instrument(skip(pool), fields(model = "Customer"))]
-    pub async fn find_by_email(email: String, pool: &PgPool) -> Result<Option<Self>> {
-        let customer = query_as!(
-            Customer,
-            r#"
-            SELECT * FROM customers WHERE email = $1;
-            "#,
-            email
-        )
-        .fetch_optional(pool)
-        .await?;
-        Ok(customer)
-    }
-
-    #[tracing::instrument(skip(pool), fields(model = "Customer"))]
-    pub async fn new(
+    pub async fn find_by_email<DB: CustomerRepository>(
         email: String,
+        pool: &PgPool,
+    ) -> Result<Self> {
+        DB::find_by_email(email, pool).await
+    }
+
+    #[tracing::instrument(
+        name = "new_customer",
+        skip(pool, password),
+        fields(model = "Customer")
+    )]
+    pub async fn new<DB: CustomerRepository>(
+        email: String,
+        password: String,
         first_name: String,
         last_name: String,
         pool: &PgPool,
+    ) -> Result<Uuid> {
+        let public_id = Uuid::new_v4();
+        let id = Uuid::new_v4();
+        let password_hash = auth::hash_password(&password)?;
+
+        DB::create_new_user(
+            public_id,
+            id,
+            &email,
+            &password_hash,
+            &first_name,
+            &last_name,
+            pool,
+        )
+        .await?;
+        Ok(id)
+    }
+
+    #[tracing::instrument(skip(pool), fields(model = "Customer"))]
+    pub async fn update<DB: CustomerRepository>(
+        id: Uuid,
+        update: Vec<CustomerUpdate>,
+        pool: &PgPool,
     ) -> Result<Self> {
-        let new_customer = query_as!(
-            Customer,
-            r#"
-            INSERT INTO customers ( id, email, first_name, last_name )
-            VALUES ( $1, $2, $3, $4 )
-            RETURNING *;
-            "#,
-            Uuid::new_v4(),
-            email,
-            first_name,
-            last_name,
-        )
-        .fetch_one(pool)
-        .await?;
-        Ok(new_customer)
+        DB::update(id, update, pool).await?;
+        DB::find_by_id(id, pool).await
     }
 
     #[tracing::instrument(skip(pool), fields(model = "Customer"))]
-    pub async fn update(id: Uuid, update: CustomerUpdate, pool: &PgPool) -> Result<Self> {
-        let updated_customer = query_as!(
-            Customer,
-            r#"
-            UPDATE customers
-            SET email = $1, first_name = $2, last_name = $3
-            WHERE id = $4
-            RETURNING *;
-            "#,
-            update.email,
-            update.first_name,
-            update.last_name,
-            id
-        )
-        .fetch_one(pool)
-        .await?;
-        Ok(updated_customer)
-    }
-
-    #[tracing::instrument(skip(pool), fields(model = "Customer"))]
-    pub async fn add_new_cart(id: Uuid, currency: Currency, pool: &PgPool) -> Result<ShoppingCart> {
-        if let Some(cart_id) = Customer::check_cart(id, pool).await {
-            return ShoppingCart::find_by_id(cart_id, pool).await;
-        }
+    pub async fn add_new_cart<C: CustomerRepository, SC: ShoppingCartRepository>(
+        id: Uuid,
+        currency: Currency,
+        pool: &PgPool,
+    ) -> Result<ShoppingCart> {
+        if let Some(cart_id) = C::check_cart(id, pool).await {
+            return ShoppingCart::find_by_id::<SC>(cart_id, pool).await;
+        };
         let cart_id = Uuid::new_v4();
-
-        let cloned_pool = pool.clone();
-        let updated_customer_future = tokio::spawn(async move {
-            query!(
-                r#"
-            UPDATE customers
-            SET cart_id = $1
-            WHERE id = $2;
-            "#,
-                cart_id,
-                id
-            )
-            .fetch_one(&cloned_pool)
-            .await
-        });
-        let cloned_pool = pool.clone();
-        let new_cart_future = tokio::spawn(async move {
-            ShoppingCart::new_known(cart_id, id, currency, &cloned_pool).await
-        });
-
-        let (_, cart) = futures::future::join(updated_customer_future, new_cart_future).await;
-        cart?
+        C::add_new_cart(id, cart_id, currency, pool).await
     }
 }
 
 /// Private API
 impl Customer {
     #[tracing::instrument(skip(pool), fields(model = "Customer"))]
-    async fn check_cart(id: Uuid, pool: &PgPool) -> Option<Uuid> {
-        let result = query!(
-            r#"
-            SELECT cart_id FROM customers WHERE id = $1
-            "#,
-            id
-        )
-        .fetch_optional(pool)
-        .await
-        .ok()
-        .flatten();
-        if let Some(result) = result {
-            return result.cart_id;
-        }
-        None
+    async fn check_cart<DB: CustomerRepository>(id: Uuid, pool: &PgPool) -> Option<Uuid> {
+        DB::check_cart(id, pool).await
     }
 }
 
@@ -198,7 +138,9 @@ impl Customer {
     async fn cart(&self, ctx: &Context<'_>) -> Option<ShoppingCart> {
         let pool = ctx.data::<PgPool>().ok()?;
         if let Some(cart_id) = self.cart_id {
-            return ShoppingCart::find_by_id(cart_id, pool).await.ok();
+            return ShoppingCart::find_by_id::<ShoppingCartDatabase>(cart_id, pool)
+                .await
+                .ok();
         }
         None
     }

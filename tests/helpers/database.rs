@@ -6,6 +6,7 @@ use crate::helpers::IdHolder;
 
 use bazaar::{
     configuration::DatabaseSettings,
+    database::{CustomerDatabase, ShoppingCartDatabase},
     models::{Currency, Customer},
 };
 
@@ -25,6 +26,7 @@ pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
         .run(&pool)
         .await
         .expect("failed to run database migrations");
+    // Seed the items database for tests
     sqlx::query_file!("scripts/seed_items.sql")
         .execute(&pool)
         .await
@@ -36,12 +38,12 @@ pub async fn insert_default_customer(pool: &PgPool) -> Result<IdHolder> {
     let email = format!("{}@test.com", Uuid::nil());
     let first_name = Uuid::nil().to_string();
     let last_name = Uuid::nil().to_string();
+    let password = Uuid::nil().to_string();
 
-    let customer = Customer::new(email, first_name, last_name, pool).await;
-    dbg!(&customer);
-    let customer = customer.expect("failed to insert default customer");
+    let customer =
+        Customer::new::<CustomerDatabase>(email, password, first_name, last_name, pool).await?;
     Ok(IdHolder {
-        customer: Some(customer.id),
+        customer: Some(customer),
         cart: None,
     })
 }
@@ -50,17 +52,18 @@ pub async fn insert_default_customer_with_cart(pool: &PgPool) -> Result<IdHolder
     let email = format!("{}@test.com", Uuid::nil());
     let first_name = Uuid::nil().to_string();
     let last_name = Uuid::nil().to_string();
+    let password = Uuid::nil().to_string();
+    let customer =
+        Customer::new::<CustomerDatabase>(email, password, first_name, last_name, pool).await?;
 
-    let customer = Customer::new(email, first_name, last_name, pool)
-        .await
-        .expect("failed to insert default customer");
-    dbg!(&customer);
-    let cart = Customer::add_new_cart(customer.id, Currency::GBP, pool)
-        .await
-        .expect("failed to attach cart to default customer");
-    dbg!(&cart);
+    let cart = Customer::add_new_cart::<CustomerDatabase, ShoppingCartDatabase>(
+        customer,
+        Currency::GBP,
+        pool,
+    )
+    .await?;
     Ok(IdHolder {
-        customer: Some(customer.id),
+        customer: Some(customer),
         cart: Some(cart.id),
     })
 }

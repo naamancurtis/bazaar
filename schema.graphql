@@ -1,7 +1,8 @@
 type QueryRoot {
 	customers: [Customer!]!
-	customerById(id: UUID!): Customer
-	customerByEmail(email: String!): Customer
+	customerById(id: UUID!): Customer!
+	customerByEmail(email: String!): Customer!
+	cartById(id: UUID!): ShoppingCart!
 }
 """
 Graphql Resolver
@@ -52,16 +53,16 @@ type CartItem {
 	tags: [String!]!
 }
 type MutationRoot {
-	createCustomer(email: String!, firstName: String!, lastName: String!): Customer!
-	updateCustomer(id: UUID!, update: CustomerUpdate!): Customer!
+	createCustomer(email: String!, password: String!, firstName: String!, lastName: String!): Customer!
+	updateCustomer(id: UUID!, update: [CustomerUpdate!]!): Customer!
 	createAnonymousCart(currency: Currency!): ShoppingCart!
 	createKnownCart(id: UUID!, currency: Currency!): ShoppingCart!
-	addItemsToCart(id: UUID!, updatedItems: [UpdateCartItem!]!): ShoppingCart!
+	addItemsToCart(id: UUID!, newItems: [UpdateCartItem!]!): ShoppingCart!
+	removeItemsFromCart(id: UUID!, removedItems: [UpdateCartItem!]!): ShoppingCart!
 }
 input CustomerUpdate {
-email: String!
-firstName: String!
-lastName: String!
+key: String!
+value: String!
 }
 input UpdateCartItem {
 sku: String!
