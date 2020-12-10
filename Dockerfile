@@ -19,7 +19,7 @@ COPY --from=cacher /app/target target
 COPY --from=cacher /usr/local/cargo /usr/local/cargo
 COPY . .
 ENV SQLX_OFFLINE true
-RUN cargo build --release
+RUN cargo build --release --bin app
 
 # === Generate a lean runtime for the binary ===
 FROM debian:buster-slim AS runtime
