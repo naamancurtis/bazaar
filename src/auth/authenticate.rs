@@ -2,10 +2,27 @@ use anyhow::Result;
 use argon2::{self, Config, ThreadMode, Variant, Version};
 use lazy_static::lazy_static;
 use std::env::var;
+use tracing::error;
 
+// @TODO - check these are actually okay being `lazy_static` - if the server
+// is left up and running for a long time, but we wanted to cycle keys every x
+// days, would this pick up on the changes? or would it store a constant value
+// for the whole period of time the server is up
 lazy_static! {
-    pub static ref SECRET_KEY: String = var("SECRET_KEY").expect("no secret key found");
-    pub static ref SALT: String = var("SALT").expect("no salt found");
+    pub static ref SECRET_KEY: String = {
+        let secret_key: Result<String, ()> = var("SECRET_KEY").map_err(|e| {
+            error!(err = ?e, "failed to retrieve secret key");
+            panic!("no SECRET KEY was provided");
+        });
+        secret_key.unwrap()
+    };
+    pub static ref SALT: String = {
+        let salt: Result<String, ()> = var("SALT").map_err(|e| {
+            error!(err = ?e, "failed to retrieve salt");
+            panic!("no salt was provided");
+        });
+        salt.unwrap()
+    };
 }
 
 #[cfg(not(test))]

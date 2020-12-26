@@ -7,7 +7,7 @@ use std::env::var;
 use std::fmt;
 
 #[derive(Deserialize)]
-pub struct Settings {
+pub struct Configuration {
     pub database: DatabaseSettings,
     pub application: ApplicationSettings,
 }
@@ -30,13 +30,14 @@ pub struct DatabaseSettings {
     pub require_ssl: bool,
 }
 
+#[derive(Debug)]
 pub enum Environment {
     Local,
     CI,
     Production,
 }
 
-pub fn get_configuration() -> Result<Settings, config::ConfigError> {
+pub fn get_configuration() -> Result<Configuration, config::ConfigError> {
     let mut settings = Config::default();
     let base_path = std::env::current_dir().expect("failed to determine current directory");
     let configuration_directory = base_path.join("configuration");
@@ -56,9 +57,13 @@ pub fn get_configuration() -> Result<Settings, config::ConfigError> {
     settings.try_into()
 }
 
-impl Settings {
+impl Configuration {
     pub fn set_database_name(&mut self, name: String) {
         self.database.database_name = name;
+    }
+
+    pub fn get_addr(&self) -> String {
+        format!("{}:{}", self.application.host, self.application.port)
     }
 }
 
