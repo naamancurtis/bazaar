@@ -1,13 +1,15 @@
 use anyhow::anyhow;
 use chrono::{Duration, Utc};
-use jsonwebtoken::{decode, encode, Algorithm, DecodingKey, EncodingKey, Header, Validation};
+use jsonwebtoken::{
+    decode, encode, Algorithm, DecodingKey, EncodingKey, Header, TokenData, Validation,
+};
 use lazy_static::lazy_static;
 use std::env;
 use tracing::error;
 use uuid::Uuid;
 
 use crate::{
-    models::{BazaarToken, Claims, CustomerType, TokenType},
+    models::{Claims, CustomerType, TokenType},
     BazaarError,
 };
 
@@ -66,6 +68,7 @@ pub fn encode_token(
         cart_id,
         exp: exp.timestamp() as usize,
         iat: iat.timestamp() as usize,
+        id: None,
     };
     encode_jwt(&claims, token_type)
 }
@@ -85,7 +88,7 @@ pub(crate) fn encode_jwt(claims: &Claims, token_type: TokenType) -> anyhow::Resu
 }
 
 #[tracing::instrument(skip(token))]
-pub fn decode_token(token: &str, token_type: TokenType) -> Result<BazaarToken, BazaarError> {
+pub fn decode_token(token: &str, token_type: TokenType) -> Result<TokenData<Claims>, BazaarError> {
     let key = if token_type == TokenType::Access {
         ACCESS_TOKEN_PUBLIC_KEY.as_bytes()
     } else {
@@ -120,6 +123,7 @@ mod tests {
             cart_id: Uuid::new_v4(),
             exp: exp.timestamp() as usize,
             iat: iat.timestamp() as usize,
+            id: None,
         };
         let token = encode_jwt(&claims, TokenType::Access).unwrap();
         let decoding_key = DecodingKey::from_rsa_pem(ACCESS_TOKEN_PUBLIC_KEY.as_bytes()).unwrap();

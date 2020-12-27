@@ -1,11 +1,14 @@
-use async_graphql::{validators::Email, Context, Error, Object, Result};
+use async_graphql::{validators::Email, Context, Error, ErrorExtensions, Object, Result};
 use sqlx::PgPool;
+use tracing::error;
 use uuid::Uuid;
 
 use crate::{
     database::{CustomerDatabase, ShoppingCartDatabase},
     error::generate_error_log,
-    models::{Customer, ShoppingCart},
+    graphql::extract_token_and_database_pool,
+    models::{BearerToken, Customer, ShoppingCart, TokenType},
+    BazaarError,
 };
 
 pub struct QueryRoot;
@@ -24,14 +27,20 @@ impl QueryRoot {
     }
 
     #[tracing::instrument(skip(self, ctx))]
-    async fn customer_by_id(&self, ctx: &Context<'_>, id: Uuid) -> Result<Customer> {
-        let pool = ctx.data::<PgPool>()?;
-        Customer::find_by_id::<CustomerDatabase>(id, pool)
+    async fn customer<'ctx>(&self, ctx: &'ctx Context<'_>) -> Result<Customer> {
+        let (pool, token) = extract_token_and_database_pool(ctx, TokenType::Access)
             .await
-            .map_err(|err| {
-                generate_error_log(err, None);
-                Error::new("unable to find customer")
-            })
+            .map_err(|e| e.extend())?;
+        if let Some(id) = token.id() {
+            Customer::find_by_id::<CustomerDatabase>(id, pool)
+                .await
+                .map_err(|err| {
+                    generate_error_log(err, None);
+                    BazaarError::NotFound.extend()
+                })
+        } else {
+            Err(BazaarError::Unauthorized.extend())
+        }
     }
 
     #[tracing::instrument(skip(self, ctx))]

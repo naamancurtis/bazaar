@@ -15,6 +15,7 @@ pub fn create_valid_jwt_token(token_type: TokenType) -> (String, Claims) {
         cart_id: Uuid::new_v4(),
         exp: exp.timestamp() as usize,
         iat: iat.timestamp() as usize,
+        id: None,
     };
     let token = encode_jwt(&claims, token_type).unwrap();
     (token, claims)

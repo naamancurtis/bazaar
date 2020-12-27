@@ -1,6 +1,6 @@
 type QueryRoot {
 	customers: [Customer!]!
-	customerById(id: UUID!): Customer!
+	customer: Customer!
 	customerByEmail(email: String!): Customer!
 	cartById(id: UUID!): ShoppingCart!
 }

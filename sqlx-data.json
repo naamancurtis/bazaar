@@ -191,6 +191,26 @@
       ]
     }
   },
+  "4a9afd3d5b773e061ae419b3471666e65bbf0877a2ff0f9cfbcf69ad5f2849a2": {
+    "query": "\n            SELECT id FROM auth WHERE public_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "52c254bfa828472a448ba23bc2eafe77c4337ce645cc61443b997eeb4f7fc74f": {
     "query": "\n            SELECT * FROM customers WHERE id = $1\n            ",
     "describe": {
