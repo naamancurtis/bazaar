@@ -9,5 +9,9 @@ mod startup;
 pub mod telemetry;
 
 pub use configuration::get_configuration;
+pub use error::BazaarError;
 pub use graphql::{BazaarSchema, MutationRoot, QueryRoot};
 pub use startup::{build_app, generate_schema};
+
+#[cfg(test)]
+pub mod test_helpers;

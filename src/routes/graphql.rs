@@ -9,10 +9,10 @@ pub async fn graphql_index(schema: web::Data<BazaarSchema>, req: Request) -> Res
     schema.execute(req.into_inner()).await.into()
 }
 
-pub async fn graphql_playground() -> actix_web::Result<HttpResponse> {
-    Ok(HttpResponse::Ok()
+pub async fn graphql_playground() -> HttpResponse {
+    HttpResponse::Ok()
         .content_type("text/html; charset=utf-8")
         .body(playground_source(
             GraphQLPlaygroundConfig::new("/").subscription_endpoint("/"),
-        )))
+        ))
 }
