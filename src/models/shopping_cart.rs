@@ -1,4 +1,3 @@
-use anyhow::Result;
 use async_graphql::{Context, Object};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -11,6 +10,7 @@ use uuid::Uuid;
 use crate::{
     database::{CartItemDatabase, CartItemRepository, ShoppingCartRepository},
     models::{cart_item::InternalCartItem, CartItem, Currency},
+    Result,
 };
 
 #[derive(Debug, async_graphql::Enum, Copy, Clone, Eq, PartialEq, Deserialize, sqlx::Type)]
@@ -61,6 +61,14 @@ impl ShoppingCart {
         pool: &PgPool,
     ) -> Result<Self> {
         DB::find_by_customer_id(customer_id, pool).await
+    }
+
+    #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
+    pub async fn find_cart_id_by_customer_id<DB: ShoppingCartRepository>(
+        customer_id: Uuid,
+        pool: &PgPool,
+    ) -> Result<Uuid> {
+        DB::find_cart_id_by_customer_id(customer_id, pool).await
     }
 
     #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]

@@ -1,6 +1,7 @@
 CREATE TABLE auth(
-  public_id uuid NOT NULL,
-  PRIMARY KEY (public_id),
+  email TEXT NOT NULL,
+  PRIMARY KEY (email),
+  public_id uuid NOT NULL UNIQUE,
   id uuid NOT NULL UNIQUE,
   password_hash TEXT NOT NULL,
   created_at timestamptz NOT NULL DEFAULT NOW(),

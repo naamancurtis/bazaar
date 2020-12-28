@@ -8,6 +8,15 @@ use crate::{
     BazaarError,
 };
 
+pub async fn extract_token_and_database_pool<'a>(
+    context: &'a Context<'_>,
+    token_type: TokenType,
+) -> Result<(&'a PgPool, BazaarToken), BazaarError> {
+    let pool = extract_database_pool(context)?;
+    let token = extract_token(context, token_type, pool).await?;
+    Ok((pool, token))
+}
+
 pub async fn extract_token(
     context: &Context<'_>,
     token_type: TokenType,
@@ -25,13 +34,4 @@ pub fn extract_database_pool<'a>(context: &'a Context<'_>) -> Result<&'a PgPool,
         error!(err = ?err, "failed to extract database pool from graphql context");
         BazaarError::ServerError(err.message)
     })
-}
-
-pub async fn extract_token_and_database_pool<'a>(
-    context: &'a Context<'_>,
-    token_type: TokenType,
-) -> Result<(&'a PgPool, BazaarToken), BazaarError> {
-    let pool = extract_database_pool(context)?;
-    let token = extract_token(context, token_type, pool).await?;
-    Ok((pool, token))
 }

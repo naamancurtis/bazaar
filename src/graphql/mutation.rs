@@ -1,15 +1,15 @@
 use async_graphql::{
     validators::{Email, StringMinLength},
-    Context, Error, Object, Result,
+    Context, ErrorExtensions, Object, Result,
 };
 use sqlx::PgPool;
 use tracing::error;
 use uuid::Uuid;
 
 use crate::{
-    database::{CartItemDatabase, CustomerDatabase, ShoppingCartDatabase},
-    error::generate_error_log,
-    graphql::validators::ValidCustomerUpdateType,
+    auth::{generate_tokens, verify_password_and_fetch_details, BazaarTokens},
+    database::{AuthDatabase, CartItemDatabase, CustomerDatabase, ShoppingCartDatabase},
+    graphql::{extract_database_pool, validators::ValidCustomerUpdateType},
     models::{
         cart_item::{InternalCartItem, UpdateCartItem},
         Currency, Customer, CustomerUpdate, ShoppingCart,
@@ -20,6 +20,28 @@ pub struct MutationRoot;
 
 #[Object]
 impl MutationRoot {
+    #[tracing::instrument(skip(self, ctx, email, password))]
+    async fn login(
+        &self,
+        ctx: &Context<'_>,
+        email: String,
+        password: String,
+    ) -> Result<BazaarTokens> {
+        let pool = extract_database_pool(ctx).map_err(|e| e.extend())?;
+        let customer_details =
+            verify_password_and_fetch_details::<AuthDatabase>(&email, &password, pool)
+                .await
+                .map_err(|e| e.extend())?;
+        let cart_id = ShoppingCart::find_cart_id_by_customer_id::<ShoppingCartDatabase>(
+            customer_details.id,
+            pool,
+        )
+        .await?;
+        let tokens =
+            generate_tokens(Some(customer_details.public_id), cart_id).map_err(|e| e.extend());
+        tokens
+    }
+
     // @TODO - Once there's an auth token, we need to ensure that if the user has an
     // anonymous cart, it's correctly added when they're signing up
     #[tracing::instrument(skip(self, ctx, password))]
@@ -35,16 +57,14 @@ impl MutationRoot {
         let id = Customer::new::<CustomerDatabase>(email, password, first_name, last_name, pool)
             .await
             .map_err(|err| {
-                error!(?err, "create failed");
-                generate_error_log(err, None);
-                Error::new("unable to create new customer")
+                error!(?err, "failed to create new customer");
+                err.extend()
             })?;
         Customer::find_by_id::<CustomerDatabase>(id, pool)
             .await
             .map_err(|err| {
-                error!(?err, "find failed");
-                generate_error_log(err, None);
-                Error::new("unable to find new customer")
+                error!(?err, "failed to find newly created customer");
+                err.extend()
             })
     }
 
@@ -59,8 +79,8 @@ impl MutationRoot {
         Customer::update::<CustomerDatabase>(id, update, pool)
             .await
             .map_err(|err| {
-                generate_error_log(err, None);
-                Error::new("unable to update new customer")
+                error!(?err, "failed to update customer");
+                err.extend()
             })
     }
 
@@ -74,8 +94,8 @@ impl MutationRoot {
         ShoppingCart::new_anonymous::<ShoppingCartDatabase>(currency, pool)
             .await
             .map_err(|err| {
-                generate_error_log(err, None);
-                Error::new("unable to create cart")
+                error!(?err, "failed to create anonymous cart");
+                err.extend()
             })
     }
 
@@ -90,8 +110,8 @@ impl MutationRoot {
         Customer::add_new_cart::<CustomerDatabase, ShoppingCartDatabase>(id, currency, pool)
             .await
             .map_err(|err| {
-                generate_error_log(err, None);
-                Error::new("unable to create cart for customer")
+                error!(?err, "failed to create known cart");
+                err.extend()
             })
     }
 
@@ -110,8 +130,8 @@ impl MutationRoot {
         )
         .await
         .map_err(|err| {
-            generate_error_log(err, None);
-            Error::new("unable to add items to cart")
+            error!(?err, "failed to add items to cart");
+            err.extend()
         })
     }
 
@@ -137,8 +157,8 @@ impl MutationRoot {
         )
         .await
         .map_err(|err| {
-            generate_error_log(err, None);
-            Error::new("unable to remove items from cart")
+            error!(?err, "failed to remove items from cart");
+            err.extend()
         })
     }
 }

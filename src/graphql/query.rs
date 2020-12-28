@@ -5,9 +5,8 @@ use uuid::Uuid;
 
 use crate::{
     database::{CustomerDatabase, ShoppingCartDatabase},
-    error::generate_error_log,
     graphql::extract_token_and_database_pool,
-    models::{BearerToken, Customer, ShoppingCart, TokenType},
+    models::{Customer, ShoppingCart, TokenType},
     BazaarError,
 };
 
@@ -15,13 +14,14 @@ pub struct QueryRoot;
 
 #[Object]
 impl QueryRoot {
+    // @TODO Remove this - only here for QoL while developing
     #[tracing::instrument(name = "get_customers", skip(self, ctx))]
     async fn customers(&self, ctx: &Context<'_>) -> Result<Vec<Customer>> {
         let pool = ctx.data::<PgPool>()?;
         Customer::find_all::<CustomerDatabase>(pool)
             .await
             .map_err(|err| {
-                generate_error_log(err, None);
+                error!(?err, "failed to fetch all customers");
                 Error::new("unable to fetch customers")
             })
     }
@@ -31,16 +31,16 @@ impl QueryRoot {
         let (pool, token) = extract_token_and_database_pool(ctx, TokenType::Access)
             .await
             .map_err(|e| e.extend())?;
+
         if let Some(id) = token.id() {
-            Customer::find_by_id::<CustomerDatabase>(id, pool)
+            return Customer::find_by_id::<CustomerDatabase>(id, pool)
                 .await
                 .map_err(|err| {
-                    generate_error_log(err, None);
+                    error!(?err, "failed to find customer");
                     BazaarError::NotFound.extend()
-                })
-        } else {
-            Err(BazaarError::Unauthorized.extend())
+                });
         }
+        Err(BazaarError::Unauthorized.extend())
     }
 
     #[tracing::instrument(skip(self, ctx))]
@@ -53,7 +53,7 @@ impl QueryRoot {
         Customer::find_by_email::<CustomerDatabase>(email, pool)
             .await
             .map_err(|err| {
-                generate_error_log(err, None);
+                error!(?err, "failed to find customer");
                 Error::new("unable to find customer")
             })
     }
@@ -64,7 +64,7 @@ impl QueryRoot {
         ShoppingCart::find_by_id::<ShoppingCartDatabase>(id, pool)
             .await
             .map_err(|err| {
-                generate_error_log(err, None);
+                error!(?err, "failed to find customer's cart");
                 Error::new("unable to find cart")
             })
     }

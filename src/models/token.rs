@@ -23,6 +23,7 @@ pub struct BazaarToken {
     exp: DateTime<Utc>,
     customer_type: CustomerType,
     cart_id: Uuid,
+    token_type: TokenType,
 }
 
 impl From<TokenData<Claims>> for BazaarToken {
@@ -42,6 +43,7 @@ impl From<TokenData<Claims>> for BazaarToken {
             exp: utc_from_timestamp(claims.exp),
             customer_type: claims.customer_type,
             cart_id: claims.cart_id,
+            token_type: claims.token_type,
         }
     }
 }
@@ -70,6 +72,10 @@ impl BazaarToken {
     pub fn time_till_expiry(&self) -> Duration {
         self.exp - Utc::now()
     }
+
+    pub fn token_type(&self) -> TokenType {
+        self.token_type
+    }
 }
 
 fn utc_from_timestamp(timestamp: usize) -> DateTime<Utc> {
@@ -90,6 +96,7 @@ pub struct Claims {
     pub cart_id: Uuid,
     pub exp: usize,
     pub iat: usize,
+    pub token_type: TokenType,
     #[serde(skip)]
     pub id: Option<Uuid>,
 }
@@ -147,9 +154,13 @@ pub async fn parse_and_deserialize_token<R: AuthRepository>(
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_helpers::{create_valid_jwt_token, set_token_env_vars_for_tests};
     use async_trait::async_trait;
     use claim::{assert_err, assert_some};
+
+    use crate::{
+        models::auth::AuthCustomer,
+        test_helpers::{create_valid_jwt_token, set_token_env_vars_for_tests},
+    };
 
     struct MockAuthRepo;
 
@@ -157,6 +168,13 @@ mod tests {
     impl AuthRepository for MockAuthRepo {
         async fn map_id(id: Option<Uuid>, pool: &PgPool) -> Option<Uuid> {
             Some(Uuid::new_v4())
+        }
+
+        async fn get_auth_customer(
+            email: &str,
+            pool: &PgPool,
+        ) -> Result<AuthCustomer, BazaarError> {
+            unimplemented!("Not used for these tests");
         }
     }
 

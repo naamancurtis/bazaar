@@ -16,6 +16,7 @@ pub fn create_valid_jwt_token(token_type: TokenType) -> (String, Claims) {
         exp: exp.timestamp() as usize,
         iat: iat.timestamp() as usize,
         id: None,
+        token_type,
     };
     let token = encode_jwt(&claims, token_type).unwrap();
     (token, claims)

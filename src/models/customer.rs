@@ -1,4 +1,3 @@
-use anyhow::Result;
 use async_graphql::{Context, InputObject, Object};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -9,6 +8,7 @@ use crate::{
     auth,
     database::{CustomerRepository, ShoppingCartDatabase, ShoppingCartRepository},
     models::{Currency, ShoppingCart},
+    Result,
 };
 
 #[derive(Debug, Deserialize)]
@@ -71,6 +71,7 @@ impl Customer {
             &password_hash,
             &first_name,
             &last_name,
+            Currency::GBP,
             pool,
         )
         .await?;

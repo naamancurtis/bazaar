@@ -1,3 +1,4 @@
+pub(crate) mod auth;
 pub mod cart_item;
 mod currency;
 pub mod customer;

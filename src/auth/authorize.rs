@@ -1,4 +1,3 @@
-use anyhow::anyhow;
 use chrono::{Duration, Utc};
 use jsonwebtoken::{
     decode, encode, Algorithm, DecodingKey, EncodingKey, Header, TokenData, Validation,
@@ -9,10 +8,15 @@ use tracing::error;
 use uuid::Uuid;
 
 use crate::{
+    auth::{ACCESS_TOKEN_DURATION, REFRESH_TOKEN_DURATION},
     models::{Claims, CustomerType, TokenType},
     BazaarError,
 };
 
+// @TODO - check these are actually okay being `lazy_static` - if the server
+// is left up and running for a long time, but we wanted to cycle keys every x
+// days, would this pick up on the changes? or would it store a constant value
+// for the whole period of time the server is up
 lazy_static! {
     static ref ACCESS_TOKEN_PRIVATE_KEY: String = {
         let key = env::var("ACCESS_TOKEN_PRIVATE_KEY").map_err(|e| {
@@ -49,12 +53,12 @@ pub fn encode_token(
     user_id: Option<Uuid>,
     cart_id: Uuid,
     token_type: TokenType,
-) -> anyhow::Result<String> {
+) -> Result<String, BazaarError> {
     let iat = Utc::now();
     let exp = if token_type == TokenType::Access {
-        iat + Duration::minutes(15)
+        iat + Duration::seconds(ACCESS_TOKEN_DURATION)
     } else {
-        iat + Duration::weeks(4)
+        iat + Duration::seconds(REFRESH_TOKEN_DURATION)
     };
     let customer_type = if user_id.is_some() {
         CustomerType::Known
@@ -69,21 +73,25 @@ pub fn encode_token(
         exp: exp.timestamp() as usize,
         iat: iat.timestamp() as usize,
         id: None,
+        token_type,
     };
     encode_jwt(&claims, token_type)
 }
 
-pub(crate) fn encode_jwt(claims: &Claims, token_type: TokenType) -> anyhow::Result<String> {
+pub(crate) fn encode_jwt(claims: &Claims, token_type: TokenType) -> Result<String, BazaarError> {
     let headers = Header::new(Algorithm::PS256);
     let key = if token_type == TokenType::Access {
         ACCESS_TOKEN_PRIVATE_KEY.as_bytes()
     } else {
         REFRESH_TOKEN_PRIVATE_KEY.as_bytes()
     };
-    let encoding_key = EncodingKey::from_rsa_pem(key)?;
+    let encoding_key = EncodingKey::from_rsa_pem(key).map_err(|e| {
+        error!(err = ?e, "failed to parse the jwt encoding key");
+        BazaarError::UnexpectedError
+    })?;
     encode(&headers, claims, &encoding_key).map_err(|e| {
         error!(err= ?e, "failed to encode json web token");
-        anyhow!("Unexpected error occurred while attempting to create jwt")
+        BazaarError::UnexpectedError
     })
 }
 
@@ -124,6 +132,7 @@ mod tests {
             exp: exp.timestamp() as usize,
             iat: iat.timestamp() as usize,
             id: None,
+            token_type: TokenType::Access,
         };
         let token = encode_jwt(&claims, TokenType::Access).unwrap();
         let decoding_key = DecodingKey::from_rsa_pem(ACCESS_TOKEN_PUBLIC_KEY.as_bytes()).unwrap();

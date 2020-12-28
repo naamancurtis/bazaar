@@ -94,6 +94,58 @@
       ]
     }
   },
+  "224b62a4a889ad814b8473dcc4a034676d582842756ba53e75694a00160bae9b": {
+    "query": "\n            SELECT public_id, id, password_hash FROM auth WHERE email = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "public_id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "password_hash",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "35372639a046ab0701f8171886655da053f73f6f675ee0d057f5a97d3a2623fe": {
+    "query": "\n            SELECT id FROM shopping_carts WHERE customer_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "3cfcc6ae1e35b0f4b3c0410b8ee5a56e6a88de8eeb91e7d431f49e69341e1759": {
     "query": "\n            UPDATE shopping_carts\n            SET price_before_discounts = $1, price_after_discounts = $2, items = $3::jsonb\n            WHERE id = $4\n            RETURNING \n                id, customer_id, \n                cart_type as \"cart_type!: CartType\", \n                items as \"items!: Json<Vec<InternalCartItem>>\",\n                currency as \"currency!: Currency\",\n                discounts, price_before_discounts, price_after_discounts,\n                created_at, last_modified\n            ",
     "describe": {
@@ -264,26 +316,6 @@
         false,
         false,
         true
-      ]
-    }
-  },
-  "62b40b2e35fcbefdda5a92f0e995e27135cca092b6e7380505af1d0984d36d22": {
-    "query": "\n            SELECT password_hash FROM auth WHERE public_id = $1\n        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "password_hash",
-          "type_info": "Text"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        false
       ]
     }
   },
@@ -638,8 +670,8 @@
       ]
     }
   },
-  "bcea3bb7c7a9ca03aae6c5940802c07aa9576bfd21653cb2ad467a09eb68e86e": {
-    "query": "\n            INSERT INTO customers ( id, email, first_name, last_name )\n            VALUES ( $1, $2, $3, $4 )\n            ",
+  "d10c6c4782d2ae6cf5c1ce97dc298019973c9b63ad65a51e65cd66f08a1b64a8": {
+    "query": "\n            INSERT INTO customers ( id, email, first_name, last_name, cart_id )\n            VALUES ( $1, $2, $3, $4, $5)\n            ",
     "describe": {
       "columns": [],
       "parameters": {
@@ -647,7 +679,8 @@
           "Uuid",
           "Text",
           "Text",
-          "Text"
+          "Text",
+          "Uuid"
         ]
       },
       "nullable": []
@@ -733,6 +766,41 @@
         false,
         true
       ]
+    }
+  },
+  "fbb5f7f000ca669ae6b041445ec2a3a7a5efe68fc17727f22a38dea523d02116": {
+    "query": "\n            INSERT INTO shopping_carts (id, customer_id, cart_type, currency)\n            VALUES ( $1, $2, $3, $4)\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Uuid",
+          {
+            "Custom": {
+              "name": "user_cart_type",
+              "kind": {
+                "Enum": [
+                  "ANONYMOUS",
+                  "KNOWN"
+                ]
+              }
+            }
+          },
+          {
+            "Custom": {
+              "name": "currency_type",
+              "kind": {
+                "Enum": [
+                  "GBP",
+                  "USD"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "nullable": []
     }
   }
 }

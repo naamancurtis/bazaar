@@ -1,8 +1,7 @@
-use anyhow::Result;
 use async_trait::async_trait;
 use sqlx::{query, PgPool};
 
-use crate::models::CartItem;
+use crate::{models::CartItem, Result};
 
 #[async_trait]
 pub trait CartItemRepository {

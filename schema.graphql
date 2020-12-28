@@ -53,12 +53,29 @@ type CartItem {
 	tags: [String!]!
 }
 type MutationRoot {
+	login(email: String!, password: String!): BazaarTokens!
 	createCustomer(email: String!, password: String!, firstName: String!, lastName: String!): Customer!
 	updateCustomer(id: UUID!, update: [CustomerUpdate!]!): Customer!
 	createAnonymousCart(currency: Currency!): ShoppingCart!
 	createKnownCart(id: UUID!, currency: Currency!): ShoppingCart!
 	addItemsToCart(id: UUID!, newItems: [UpdateCartItem!]!): ShoppingCart!
 	removeItemsFromCart(id: UUID!, removedItems: [UpdateCartItem!]!): ShoppingCart!
+}
+type BazaarTokens {
+	issuedAt: Int!
+	accessToken: String!
+	"""
+	Time until expiry (in seconds)
+	"""
+	accessTokenExpiresIn: Int!
+	"""
+	This token is automatically set in the cookies
+	"""
+	refreshToken: String!
+	"""
+	Time until expiry (in seconds)
+	"""
+	refreshTokenExpiresIn: Int!
 }
 input CustomerUpdate {
 key: String!

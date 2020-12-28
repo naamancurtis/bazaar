@@ -1,8 +1,10 @@
-use anyhow::Result;
 use argon2::{self, Config, ThreadMode, Variant, Version};
 use lazy_static::lazy_static;
+use sqlx::PgPool;
 use std::env::var;
 use tracing::error;
+
+use crate::{database::AuthRepository, models::auth::AuthCustomer, BazaarError};
 
 // @TODO - check these are actually okay being `lazy_static` - if the server
 // is left up and running for a long time, but we wanted to cycle keys every x
@@ -55,12 +57,25 @@ lazy_static! {
     };
 }
 
-pub fn hash_password(password: &str) -> Result<String> {
+/// Returns true if the password matches the stored password hash
+pub async fn verify_password_and_fetch_details<DB: AuthRepository>(
+    email: &str,
+    password: &str,
+    pool: &PgPool,
+) -> Result<AuthCustomer, BazaarError> {
+    let customer = DB::get_auth_customer(email, pool).await?;
+    if _verify_password(&password, &customer.password_hash)? {
+        return Ok(customer);
+    }
+    Err(BazaarError::IncorrectCredentials)
+}
+
+pub fn hash_password(password: &str) -> Result<String, BazaarError> {
     let hash = argon2::hash_encoded(password.as_bytes(), SALT.as_bytes(), &CONFIG)?;
     Ok(hash)
 }
 
-pub fn verify_password(password: &str, hashed_password: &str) -> Result<bool> {
+fn _verify_password(password: &str, hashed_password: &str) -> Result<bool, BazaarError> {
     let matches = argon2::verify_encoded_ext(
         &hashed_password,
         password.as_bytes(),
@@ -73,6 +88,31 @@ pub fn verify_password(password: &str, hashed_password: &str) -> Result<bool> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use async_trait::async_trait;
+    use claim::assert_ok;
+    use uuid::Uuid;
+
+    use crate::database::AuthRepository;
+
+    struct MockAuthRepo;
+
+    #[async_trait]
+    impl AuthRepository for MockAuthRepo {
+        async fn map_id(id: Option<Uuid>, pool: &PgPool) -> Option<Uuid> {
+            None
+        }
+        // Hacky, but just returning the email - so pass the hash through as the email
+        async fn get_auth_customer(
+            email: &str,
+            pool: &PgPool,
+        ) -> Result<AuthCustomer, BazaarError> {
+            Ok(AuthCustomer {
+                id: Uuid::new_v4(),
+                public_id: Uuid::new_v4(),
+                password_hash: email.to_string(),
+            })
+        }
+    }
 
     fn set_up_env_vars() {
         use std::env::set_var;
@@ -95,11 +135,23 @@ mod tests {
         assert!(matches);
     }
 
-    #[test]
-    fn verify_password_works() {
+    #[tokio::test]
+    async fn verify_password_works() {
         set_up_env_vars();
         let password = String::from("SUPERsecretPasSword1234");
         let hashed_password = hash_password(&password).expect("hash failed");
-        assert!(verify_password(&password, &hashed_password).unwrap());
+        let pool = PgPool::connect_lazy("inmem").expect("fake pool failed to connect");
+        assert_ok!(
+            verify_password_and_fetch_details::<MockAuthRepo>(&hashed_password, &password, &pool)
+                .await
+        );
+    }
+
+    #[test]
+    fn _verify_password_works() {
+        set_up_env_vars();
+        let password = String::from("SUPERsecretPasSword1234");
+        let hashed_password = hash_password(&password).expect("hash failed");
+        assert!(_verify_password(&password, &hashed_password).unwrap());
     }
 }

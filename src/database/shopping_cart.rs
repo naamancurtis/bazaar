@@ -1,19 +1,22 @@
-use anyhow::Result;
 use async_trait::async_trait;
 use serde_json::Value;
-use sqlx::{query_as, types::Json, PgPool};
+use sqlx::{query, query_as, types::Json, PgPool};
 use uuid::Uuid;
 
-use crate::models::{
-    cart_item::InternalCartItem,
-    shopping_cart::{CartType, SqlxShoppingCart},
-    Currency, ShoppingCart,
+use crate::{
+    models::{
+        cart_item::InternalCartItem,
+        shopping_cart::{CartType, SqlxShoppingCart},
+        Currency, ShoppingCart,
+    },
+    Result,
 };
 
 #[async_trait]
 pub trait ShoppingCartRepository {
     async fn find_by_id(id: Uuid, pool: &PgPool) -> Result<ShoppingCart>;
     async fn find_by_customer_id(id: Uuid, pool: &PgPool) -> Result<ShoppingCart>;
+    async fn find_cart_id_by_customer_id(id: Uuid, pool: &PgPool) -> Result<Uuid>;
     async fn create_new_cart(
         id: Uuid,
         customer_id: Option<Uuid>,
@@ -70,6 +73,18 @@ impl ShoppingCartRepository for ShoppingCartDatabase {
         .fetch_one(pool)
         .await?;
         Ok(cart.into())
+    }
+
+    async fn find_cart_id_by_customer_id(id: Uuid, pool: &PgPool) -> Result<Uuid> {
+        let cart_id = query!(
+            r#"
+            SELECT id FROM shopping_carts WHERE customer_id = $1
+            "#,
+            id
+        )
+        .fetch_one(pool)
+        .await?;
+        Ok(cart_id.id)
     }
 
     async fn create_new_cart(

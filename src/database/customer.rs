@@ -1,4 +1,3 @@
-use anyhow::Result;
 use async_trait::async_trait;
 use sqlx::{query, query_as, PgPool};
 use tracing::error;
@@ -6,7 +5,8 @@ use uuid::Uuid;
 
 use crate::{
     database::ShoppingCartDatabase,
-    models::{Currency, Customer, CustomerUpdate, ShoppingCart},
+    models::{shopping_cart::CartType, Currency, Customer, CustomerUpdate, ShoppingCart},
+    Result,
 };
 
 #[async_trait]
@@ -18,6 +18,7 @@ pub trait CustomerRepository {
         password_hash: &str,
         first_name: &str,
         last_name: &str,
+        currency: Currency,
         pool: &PgPool,
     ) -> Result<()>;
     async fn find_all(pool: &PgPool) -> Result<Vec<Customer>>;
@@ -86,8 +87,11 @@ impl CustomerRepository for CustomerDatabase {
         password_hash: &str,
         first_name: &str,
         last_name: &str,
+        currency: Currency,
         pool: &PgPool,
     ) -> Result<()> {
+        let cart_id = Uuid::new_v4();
+
         let mut tx = pool.begin().await?;
 
         query!(
@@ -104,13 +108,27 @@ impl CustomerRepository for CustomerDatabase {
 
         query!(
             r#"
-            INSERT INTO customers ( id, email, first_name, last_name )
-            VALUES ( $1, $2, $3, $4 )
+            INSERT INTO customers ( id, email, first_name, last_name, cart_id )
+            VALUES ( $1, $2, $3, $4, $5)
             "#,
             id,
             email,
             first_name,
             last_name,
+            cart_id
+        )
+        .execute(&mut tx)
+        .await?;
+
+        query!(
+            r#"
+            INSERT INTO shopping_carts (id, customer_id, cart_type, currency)
+            VALUES ( $1, $2, $3, $4)
+            "#,
+            cart_id,
+            id,
+            CartType::Known as CartType,
+            Currency::GBP as Currency
         )
         .execute(&mut tx)
         .await?;
