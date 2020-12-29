@@ -3,6 +3,7 @@ use jsonwebtoken::TokenData;
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::convert::TryFrom;
+use std::marker::PhantomData;
 use std::ops::Deref;
 use tracing::warn;
 use uuid::Uuid;
@@ -18,12 +19,15 @@ use crate::{auth::decode_token, database::AuthRepository, models::CustomerType, 
 /// the application and used.
 #[derive(Debug, PartialEq, Clone, Copy)]
 pub struct BazaarToken {
-    id: Option<Uuid>,
-    iat: DateTime<Utc>,
-    exp: DateTime<Utc>,
-    customer_type: CustomerType,
-    cart_id: Uuid,
-    token_type: TokenType,
+    pub id: Option<Uuid>,
+    pub iat: usize,
+    pub exp: usize,
+    pub customer_type: CustomerType,
+    pub cart_id: Uuid,
+    pub token_type: TokenType,
+    /// This is to ensure this token isn't constructable outside of this module
+    /// ie. the only viable way to construct a token is with `Trait: From<TokenData<Claims>>`
+    _marker: PhantomData<()>,
 }
 
 impl From<TokenData<Claims>> for BazaarToken {
@@ -39,42 +43,27 @@ impl From<TokenData<Claims>> for BazaarToken {
         }
         Self {
             id: claims.id,
-            iat: utc_from_timestamp(claims.iat),
-            exp: utc_from_timestamp(claims.exp),
+            iat: claims.iat,
+            exp: claims.exp,
             customer_type: claims.customer_type,
             cart_id: claims.cart_id,
             token_type: claims.token_type,
+            _marker: PhantomData,
         }
     }
 }
 
 impl BazaarToken {
-    pub fn id(&self) -> Option<Uuid> {
-        self.id
-    }
-
-    pub fn issued_at(&self) -> &DateTime<Utc> {
-        &self.iat
-    }
-
-    pub fn expires_at(&self) -> &DateTime<Utc> {
-        &self.exp
-    }
-
-    pub fn customer_type(&self) -> CustomerType {
-        self.customer_type
-    }
-
-    pub fn cart_id(&self) -> Uuid {
-        self.cart_id
-    }
-
     pub fn time_till_expiry(&self) -> Duration {
-        self.exp - Utc::now()
+        self.expires_at() - Utc::now()
     }
 
-    pub fn token_type(&self) -> TokenType {
-        self.token_type
+    pub fn issued_at(&self) -> DateTime<Utc> {
+        utc_from_timestamp(self.iat)
+    }
+
+    pub fn expires_at(&self) -> DateTime<Utc> {
+        utc_from_timestamp(self.exp)
     }
 }
 
@@ -166,14 +155,11 @@ mod tests {
 
     #[async_trait]
     impl AuthRepository for MockAuthRepo {
-        async fn map_id(id: Option<Uuid>, pool: &PgPool) -> Option<Uuid> {
+        async fn map_id(_: Option<Uuid>, _: &PgPool) -> Option<Uuid> {
             Some(Uuid::new_v4())
         }
 
-        async fn get_auth_customer(
-            email: &str,
-            pool: &PgPool,
-        ) -> Result<AuthCustomer, BazaarError> {
+        async fn get_auth_customer(_: &str, _: &PgPool) -> Result<AuthCustomer, BazaarError> {
             unimplemented!("Not used for these tests");
         }
     }
@@ -184,13 +170,15 @@ mod tests {
         let (token, claims) = create_valid_jwt_token(TokenType::Access);
         let jwt = format!("Bearer {}", token);
         let jwt = BearerToken::try_from(jwt).expect("should provide a valid token");
-        let pool = PgPool::connect_lazy("inmem").expect("fake pool failed to connect");
+        let config = crate::get_configuration().expect("failed to read config");
+        let pool = PgPool::connect_lazy(&config.database.raw_pg_url())
+            .expect("failed to create fake connection");
         let result = parse_and_deserialize_token::<MockAuthRepo>(jwt, TokenType::Access, &pool)
             .await
             .expect("should successfully parse a valid token");
         assert_some!(result.id);
-        assert_eq!(claims.iat, result.issued_at().timestamp() as usize);
-        assert_eq!(claims.exp, result.expires_at().timestamp() as usize);
+        assert_eq!(claims.iat, result.iat);
+        assert_eq!(claims.exp, result.exp);
     }
 
     #[test]
@@ -232,7 +220,9 @@ mod tests {
             "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c".to_string()
         );
         let token = BearerToken::try_from(jwt).expect("should give valid token");
-        let pool = PgPool::connect_lazy("inmem").expect("fake pool failed to connect");
+        let config = crate::get_configuration().expect("failed to read config");
+        let pool = PgPool::connect_lazy(&config.database.raw_pg_url())
+            .expect("failed to create fake connection");
         let result =
             parse_and_deserialize_token::<MockAuthRepo>(token, TokenType::Access, &pool).await;
         assert_err!(&result);

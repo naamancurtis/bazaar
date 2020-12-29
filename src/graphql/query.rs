@@ -1,7 +1,6 @@
-use async_graphql::{validators::Email, Context, Error, ErrorExtensions, Object, Result};
+use async_graphql::{Context, Error, ErrorExtensions, Object, Result};
 use sqlx::PgPool;
 use tracing::error;
-use uuid::Uuid;
 
 use crate::{
     database::{CustomerDatabase, ShoppingCartDatabase},
@@ -32,7 +31,7 @@ impl QueryRoot {
             .await
             .map_err(|e| e.extend())?;
 
-        if let Some(id) = token.id() {
+        if let Some(id) = token?.id {
             return Customer::find_by_id::<CustomerDatabase>(id, pool)
                 .await
                 .map_err(|err| {
@@ -44,28 +43,16 @@ impl QueryRoot {
     }
 
     #[tracing::instrument(skip(self, ctx))]
-    async fn customer_by_email(
-        &self,
-        ctx: &Context<'_>,
-        #[graphql(validator(Email))] email: String,
-    ) -> Result<Customer> {
-        let pool = ctx.data::<PgPool>()?;
-        Customer::find_by_email::<CustomerDatabase>(email, pool)
+    async fn cart(&self, ctx: &Context<'_>) -> Result<ShoppingCart> {
+        let (pool, token) = extract_token_and_database_pool(ctx, TokenType::Access)
             .await
-            .map_err(|err| {
-                error!(?err, "failed to find customer");
-                Error::new("unable to find customer")
-            })
-    }
+            .map_err(|e| e.extend())?;
 
-    #[tracing::instrument(skip(self, ctx))]
-    async fn cart_by_id(&self, ctx: &Context<'_>, id: Uuid) -> Result<ShoppingCart> {
-        let pool = ctx.data::<PgPool>()?;
-        ShoppingCart::find_by_id::<ShoppingCartDatabase>(id, pool)
+        ShoppingCart::find_by_id::<ShoppingCartDatabase>(token?.cart_id, pool)
             .await
             .map_err(|err| {
                 error!(?err, "failed to find customer's cart");
-                Error::new("unable to find cart")
+                err.extend()
             })
     }
 }

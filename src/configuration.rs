@@ -85,6 +85,14 @@ impl DatabaseSettings {
             .port(self.port)
             .ssl_mode(ssl_mode)
     }
+
+    #[cfg(test)]
+    pub fn raw_pg_url(&self) -> String {
+        format!(
+            "postgres://{}:{}@{}:{}/{}",
+            self.host, self.username, self.password, self.port, self.database_name
+        )
+    }
 }
 
 impl Environment {

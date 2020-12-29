@@ -98,14 +98,11 @@ mod tests {
 
     #[async_trait]
     impl AuthRepository for MockAuthRepo {
-        async fn map_id(id: Option<Uuid>, pool: &PgPool) -> Option<Uuid> {
+        async fn map_id(_: Option<Uuid>, _: &PgPool) -> Option<Uuid> {
             None
         }
         // Hacky, but just returning the email - so pass the hash through as the email
-        async fn get_auth_customer(
-            email: &str,
-            pool: &PgPool,
-        ) -> Result<AuthCustomer, BazaarError> {
+        async fn get_auth_customer(email: &str, _: &PgPool) -> Result<AuthCustomer, BazaarError> {
             Ok(AuthCustomer {
                 id: Uuid::new_v4(),
                 public_id: Uuid::new_v4(),
@@ -140,7 +137,9 @@ mod tests {
         set_up_env_vars();
         let password = String::from("SUPERsecretPasSword1234");
         let hashed_password = hash_password(&password).expect("hash failed");
-        let pool = PgPool::connect_lazy("inmem").expect("fake pool failed to connect");
+        let config = crate::get_configuration().expect("failed to read config");
+        let pool = PgPool::connect_lazy(&config.database.raw_pg_url())
+            .expect("failed to create fake connection");
         assert_ok!(
             verify_password_and_fetch_details::<MockAuthRepo>(&hashed_password, &password, &pool)
                 .await

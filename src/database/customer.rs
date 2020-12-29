@@ -5,19 +5,17 @@ use uuid::Uuid;
 
 use crate::{
     database::ShoppingCartDatabase,
-    models::{shopping_cart::CartType, Currency, Customer, CustomerUpdate, ShoppingCart},
+    models::{
+        customer::NewCustomer, shopping_cart::CartType, Currency, Customer, CustomerUpdate,
+        ShoppingCart,
+    },
     Result,
 };
 
 #[async_trait]
 pub trait CustomerRepository {
     async fn create_new_user(
-        public_id: Uuid,
-        id: Uuid,
-        email: &str,
-        password_hash: &str,
-        first_name: &str,
-        last_name: &str,
+        customer: NewCustomer,
         currency: Currency,
         pool: &PgPool,
     ) -> Result<()>;
@@ -79,19 +77,13 @@ impl CustomerRepository for CustomerDatabase {
         Ok(customer)
     }
 
-    #[tracing::instrument(skip(pool, password_hash), fields(repository = "customer"))]
+    // Must not trace customer - includes password hash
+    #[tracing::instrument(skip(pool, customer), fields(repository = "customer"))]
     async fn create_new_user(
-        public_id: Uuid,
-        id: Uuid,
-        email: &str,
-        password_hash: &str,
-        first_name: &str,
-        last_name: &str,
+        customer: NewCustomer,
         currency: Currency,
         pool: &PgPool,
     ) -> Result<()> {
-        let cart_id = Uuid::new_v4();
-
         let mut tx = pool.begin().await?;
 
         query!(
@@ -99,9 +91,9 @@ impl CustomerRepository for CustomerDatabase {
             INSERT INTO auth (public_id, id, password_hash)
             VALUES ($1, $2, $3)
         "#,
-            public_id,
-            id,
-            password_hash
+            customer.public_id,
+            customer.private_id,
+            customer.password_hash
         )
         .execute(&mut tx)
         .await?;
@@ -111,11 +103,11 @@ impl CustomerRepository for CustomerDatabase {
             INSERT INTO customers ( id, email, first_name, last_name, cart_id )
             VALUES ( $1, $2, $3, $4, $5)
             "#,
-            id,
-            email,
-            first_name,
-            last_name,
-            cart_id
+            customer.private_id,
+            customer.email,
+            customer.first_name,
+            customer.last_name,
+            customer.cart_id
         )
         .execute(&mut tx)
         .await?;
@@ -125,8 +117,8 @@ impl CustomerRepository for CustomerDatabase {
             INSERT INTO shopping_carts (id, customer_id, cart_type, currency)
             VALUES ( $1, $2, $3, $4)
             "#,
-            cart_id,
-            id,
+            customer.cart_id,
+            customer.private_id,
             CartType::Known as CartType,
             Currency::GBP as Currency
         )

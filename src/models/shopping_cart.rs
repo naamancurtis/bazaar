@@ -99,6 +99,19 @@ impl ShoppingCart {
         cart.update_items_in_cart(items);
         cart.update_cart::<DB, CI>(pool).await
     }
+
+    #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
+    pub async fn merge_shopping_carts<DB: ShoppingCartRepository, CI: CartItemRepository>(
+        customers_cart_id: Uuid,
+        anonymous_cart_id: Uuid,
+        pool: &PgPool,
+    ) -> Result<Uuid> {
+        let mut cart = Self::find_by_id::<DB>(customers_cart_id, pool).await?;
+        let anon_cart = Self::find_by_id::<DB>(anonymous_cart_id, pool).await?;
+        cart.merge_items_from_other_cart(anon_cart);
+        cart.update_cart::<DB, CI>(pool).await?;
+        Ok(customers_cart_id)
+    }
 }
 
 /// Private API
@@ -114,6 +127,7 @@ impl ShoppingCart {
         DB::create_new_cart(id, customer_id, cart_type, currency, pool).await
     }
 
+    // @TODO - Write unit tests for this
     #[tracing::instrument(fields(model = "ShoppingCart"))]
     fn update_items_in_cart(&mut self, items: Vec<InternalCartItem>) {
         let mut current_cart_items = Vec::new();
@@ -122,6 +136,29 @@ impl ShoppingCart {
         for item in items {
             let updated_item = match item_set.take(&item) {
                 Some(old_item) => old_item + item,
+                None => item,
+            };
+            if updated_item.quantity > 0 {
+                item_set.insert(updated_item);
+            }
+        }
+        self.items = item_set.into_iter().collect::<Vec<InternalCartItem>>();
+    }
+
+    // @TODO - Write unit tests for this
+    #[tracing::instrument(fields(model = "ShoppingCart"))]
+    fn merge_items_from_other_cart(&mut self, other: Self) {
+        let mut current_cart_items = Vec::new();
+        std::mem::swap(&mut self.items, &mut current_cart_items);
+        let mut item_set: HashSet<InternalCartItem> = HashSet::from_iter(current_cart_items);
+        for item in other.items {
+            let updated_item = match item_set.take(&item) {
+                Some(mut old_item) => {
+                    // Current Logic:
+                    // If the same item is in both carts, take the largest quantity
+                    old_item.quantity = old_item.quantity.max(item.quantity);
+                    old_item
+                }
                 None => item,
             };
             if updated_item.quantity > 0 {

@@ -39,7 +39,7 @@ pub fn generate_tokens(
         issued_at: Utc::now().timestamp(),
         access_token,
         access_token_expires_in: ACCESS_TOKEN_DURATION,
-        refresh_token: refresh_token.clone(),
+        refresh_token,
         refresh_token_expires_in: REFRESH_TOKEN_DURATION,
     };
     Ok(tokens)

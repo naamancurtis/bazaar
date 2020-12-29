@@ -35,10 +35,14 @@ Most environment variables are managed through configuration files found within
 the `configuration` directory, however some that are not included in there (and
 need to be set up manually in order to run the application) can be found below
 
-| Name                      | Key          | Description                                       | Example |
-| ------------------------- | ------------ | ------------------------------------------------- | ------- |
-| Authentication Secret Key | `SECRET_KEY` | Holds the secret key used while hashing passwords | `@TODO` |
-| Authentication Salt       | `SALT`       | Holds the salt key used while hashing passwords   | `@TODO` |
+| Name                          | Key                         | Description                                               | Example                                 |
+| ----------------------------- | --------------------------- | --------------------------------------------------------- | --------------------------------------- |
+| Authentication Secret Key     | `SECRET_KEY`                | Holds the secret key used while hashing passwords         | `@TODO`                                 |
+| Authentication Salt           | `SALT`                      | Holds the salt key used while hashing passwords           | `@TODO`                                 |
+| Private key for Refresh Token | `REFRESH_TOKEN_PRIVATE_KEY` | Holds the private key for signing the refresh token JWTs  | Typical RSA Private Key (`.pem` format) |
+| Public key for Refresh Token  | `REFRESH_TOKEN_PUBLIC_KEY`  | Holds the public key for verifying the refresh token JWTs | Typical RSA Public Key (`.pem` format)  |
+| Private key for Access Token  | `ACCESS_TOKEN_PRIVATE_KEY`  | Holds the private key for signing the access token JWTs   | Typical RSA Private Key (`.pem` format) |
+| Public key for Access Token   | `ACCESS_TOKEN_PUBLIC_KEY`   | Holds the public key for verifying the access token JWTs  | Typical RSA Public Key (`.pem` format)  |
 
 ## Generating RSA Keys
 

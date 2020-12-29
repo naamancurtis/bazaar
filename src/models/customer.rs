@@ -29,6 +29,24 @@ pub struct CustomerUpdate {
     pub value: String,
 }
 
+#[derive(Debug, Clone, Copy)]
+pub struct CustomerIds {
+    id: Uuid,
+    pub public_id: Uuid,
+    pub cart_id: Uuid,
+}
+
+#[derive(Debug)]
+pub struct NewCustomer {
+    pub public_id: Uuid,
+    pub private_id: Uuid,
+    pub cart_id: Uuid,
+    pub email: String,
+    pub password_hash: String,
+    pub first_name: String,
+    pub last_name: String,
+}
+
 impl Customer {
     #[tracing::instrument(skip(pool), fields(model = "Customer"))]
     pub async fn find_all<DB: CustomerRepository>(pool: &PgPool) -> Result<Vec<Self>> {
@@ -50,32 +68,37 @@ impl Customer {
 
     #[tracing::instrument(
         name = "new_customer",
-        skip(pool, password),
+        skip(pool, email, password, first_name, last_name),
         fields(model = "Customer")
     )]
     pub async fn new<DB: CustomerRepository>(
+        id: Uuid,
         email: String,
         password: String,
         first_name: String,
         last_name: String,
+        cart_id: Uuid,
         pool: &PgPool,
-    ) -> Result<Uuid> {
+    ) -> Result<CustomerIds> {
         let public_id = Uuid::new_v4();
-        let id = Uuid::new_v4();
         let password_hash = auth::hash_password(&password)?;
 
-        DB::create_new_user(
+        let new_customer = NewCustomer {
+            public_id,
+            private_id: id,
+            cart_id,
+            email,
+            password_hash,
+            first_name,
+            last_name,
+        };
+
+        DB::create_new_user(new_customer, Currency::GBP, pool).await?;
+        Ok(CustomerIds {
             public_id,
             id,
-            &email,
-            &password_hash,
-            &first_name,
-            &last_name,
-            Currency::GBP,
-            pool,
-        )
-        .await?;
-        Ok(id)
+            cart_id,
+        })
     }
 
     #[tracing::instrument(skip(pool), fields(model = "Customer"))]

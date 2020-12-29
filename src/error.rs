@@ -18,6 +18,9 @@ pub enum BazaarError {
     #[error("Incorrect credentials provided")]
     IncorrectCredentials,
 
+    #[error("Bad Request: {0}")]
+    BadRequest(String),
+
     #[error("Invalid token provided")]
     InvalidToken(String),
 
@@ -42,28 +45,36 @@ impl ErrorExtensions for BazaarError {
         async_graphql::Error::new(format!("{}", self)).extend_with(|err, e| {
             warn!(?err, ?e, "from errors.rs looking at async");
             match self {
-                Self::NotFound => {
-                    e.set("status", 404);
-                    e.set("statusText", "NOT_FOUND");
+                Self::BadRequest(error) => {
+                    e.set("status", 400);
+                    e.set("statusText", "BAD_REQUEST");
+                    e.set("details", error.to_string());
                 }
                 Self::Unauthorized | Self::IncorrectCredentials => {
                     e.set("status", 401);
                     e.set("statusText", "UNAUTHORIZED");
                 }
+                Self::InvalidToken(error) => {
+                    e.set("status", 401);
+                    e.set("statusText", "INVALID_TOKEN");
+                    e.set("details", error.to_string());
+                }
                 Self::Forbidden => {
                     e.set("status", 403);
                     e.set("statusText", "FORBIDDEN");
                 }
-                Self::InvalidToken(error) => {
-                    e.set("status", 401);
-                    e.set("statusText", error.to_string());
+                Self::NotFound => {
+                    e.set("status", 404);
+                    e.set("statusText", "NOT_FOUND");
                 }
                 Self::ServerError(error) => {
                     e.set("status", 500);
-                    e.set("statusText", error.to_string());
+                    e.set("statusText", "SERVER_ERROR");
+                    e.set("context", error.to_string());
                 }
                 Self::UnexpectedError => {
                     e.set("status", 500);
+                    e.set("statusText", "SERVER_ERROR");
                 }
                 _ => {}
             }

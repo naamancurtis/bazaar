@@ -1,8 +1,7 @@
 type QueryRoot {
 	customers: [Customer!]!
 	customer: Customer!
-	customerByEmail(email: String!): Customer!
-	cartById(id: UUID!): ShoppingCart!
+	cart: ShoppingCart!
 }
 """
 Graphql Resolver
@@ -54,11 +53,12 @@ type CartItem {
 }
 type MutationRoot {
 	login(email: String!, password: String!): BazaarTokens!
-	createCustomer(email: String!, password: String!, firstName: String!, lastName: String!): Customer!
-	updateCustomer(id: UUID!, update: [CustomerUpdate!]!): Customer!
+	anonymousLogin: BazaarTokens!
+	signUp(email: String!, password: String!, firstName: String!, lastName: String!): BazaarTokens!
+	updateCustomer(update: [CustomerUpdate!]!): Customer!
 	createAnonymousCart(currency: Currency!): ShoppingCart!
 	createKnownCart(id: UUID!, currency: Currency!): ShoppingCart!
-	addItemsToCart(id: UUID!, newItems: [UpdateCartItem!]!): ShoppingCart!
+	addItemsToCart(newItems: [UpdateCartItem!]!): ShoppingCart!
 	removeItemsFromCart(id: UUID!, removedItems: [UpdateCartItem!]!): ShoppingCart!
 }
 type BazaarTokens {
