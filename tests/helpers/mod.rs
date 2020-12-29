@@ -2,16 +2,22 @@
 mod app;
 mod constants;
 mod database;
+mod env_vars;
 mod graphql;
 mod math;
+mod reqwest;
+mod tokens;
+mod types;
 
+pub use self::reqwest::*;
 pub use app::{spawn_app, IdHolder, TestApp};
 pub use constants::*;
-pub use database::{
-    configure_database, insert_default_customer, insert_default_customer_with_cart,
-};
+pub use database::*;
+pub use env_vars::set_env_vars_for_tests;
 pub use graphql::parse_graphql_response;
 pub use math::assert_on_decimal;
+pub use tokens::*;
+pub use types::*;
 
 use lazy_static::lazy_static;
 use serde_json::json;

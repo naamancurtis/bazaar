@@ -112,6 +112,15 @@ impl ShoppingCart {
         cart.update_cart::<DB, CI>(pool).await?;
         Ok(customers_cart_id)
     }
+
+    #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
+    pub async fn update_cart_type<DB: ShoppingCartRepository>(
+        cart_id: Uuid,
+        cart_type: CartType,
+        pool: &PgPool,
+    ) -> Result<Uuid> {
+        DB::update_cart_type(cart_id, cart_type, pool).await
+    }
 }
 
 /// Private API

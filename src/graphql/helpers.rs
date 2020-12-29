@@ -24,10 +24,9 @@ pub async fn extract_token(
     token_type: TokenType,
     pool: &PgPool,
 ) -> Result<BazaarToken> {
-    let token = context.data::<BearerToken>().map_err(|e| {
-        error!(err = ?e, "invalid token found");
-        BazaarError::InvalidToken("Token was malformed or not found".to_owned())
-    })?;
+    let token = context
+        .data::<BearerToken>()
+        .map_err(|_| BazaarError::InvalidToken("Token was malformed or not found".to_owned()))?;
     parse_and_deserialize_token::<AuthDatabase>(token.clone(), token_type, pool).await
 }
 

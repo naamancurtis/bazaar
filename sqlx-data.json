@@ -469,20 +469,6 @@
       ]
     }
   },
-  "738b62ddb898e382403250f597908591338d082fe14cb788ddbc8b3921ea8ce6": {
-    "query": "\n            INSERT INTO auth (public_id, id, password_hash)\n            VALUES ($1, $2, $3)\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Uuid",
-          "Text"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "74aed6fb59eb0ccda1d2ff17a3f1d87e84994971a1e6345c9256506e6078f439": {
     "query": "SELECT * FROM items WHERE sku = ANY ($1) ORDER BY sku ASC",
     "describe": {
@@ -529,6 +515,37 @@
         false,
         false,
         false,
+        false
+      ]
+    }
+  },
+  "9c7699d558829e3af10ce8c935d39ae2fa3a35e2c9249b5aeff4c4c71073dd2d": {
+    "query": "\n            UPDATE shopping_carts\n            SET cart_type = $1\n            WHERE id = $2\n            RETURNING id\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          {
+            "Custom": {
+              "name": "user_cart_type",
+              "kind": {
+                "Enum": [
+                  "ANONYMOUS",
+                  "KNOWN"
+                ]
+              }
+            }
+          },
+          "Uuid"
+        ]
+      },
+      "nullable": [
         false
       ]
     }
@@ -766,6 +783,21 @@
         false,
         true
       ]
+    }
+  },
+  "e4a21b64d2aff2ba8227743ec48813b71cc3d45b1793f982880ae120cb090b59": {
+    "query": "\n            INSERT INTO auth (public_id, id, password_hash, email)\n            VALUES ($1, $2, $3, $4)\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Uuid",
+          "Text",
+          "Text"
+        ]
+      },
+      "nullable": []
     }
   },
   "fbb5f7f000ca669ae6b041445ec2a3a7a5efe68fc17727f22a38dea523d02116": {

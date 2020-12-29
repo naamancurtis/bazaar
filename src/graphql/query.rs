@@ -5,7 +5,7 @@ use tracing::error;
 use crate::{
     database::{CustomerDatabase, ShoppingCartDatabase},
     graphql::extract_token_and_database_pool,
-    models::{Customer, ShoppingCart, TokenType},
+    models::{Customer, CustomerType, ShoppingCart, TokenType},
     BazaarError,
 };
 
@@ -30,14 +30,20 @@ impl QueryRoot {
         let (pool, token) = extract_token_and_database_pool(ctx, TokenType::Access)
             .await
             .map_err(|e| e.extend())?;
+        let token = token?;
 
-        if let Some(id) = token?.id {
-            return Customer::find_by_id::<CustomerDatabase>(id, pool)
+        if let Some(id) = token.id {
+            let mut customer = Customer::find_by_id::<CustomerDatabase>(id, pool)
                 .await
                 .map_err(|err| {
                     error!(?err, "failed to find customer");
                     BazaarError::NotFound.extend()
-                });
+                })?;
+            customer.id = token.public_id();
+            return Ok(customer);
+        }
+        if token.customer_type == CustomerType::Anonymous {
+            return Err(BazaarError::AnonymousError.extend());
         }
         Err(BazaarError::Unauthorized.extend())
     }

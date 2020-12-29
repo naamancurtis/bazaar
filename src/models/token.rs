@@ -25,6 +25,7 @@ pub struct BazaarToken {
     pub customer_type: CustomerType,
     pub cart_id: Uuid,
     pub token_type: TokenType,
+    sub: Option<Uuid>,
     /// This is to ensure this token isn't constructable outside of this module
     /// ie. the only viable way to construct a token is with `Trait: From<TokenData<Claims>>`
     _marker: PhantomData<()>,
@@ -48,6 +49,7 @@ impl From<TokenData<Claims>> for BazaarToken {
             customer_type: claims.customer_type,
             cart_id: claims.cart_id,
             token_type: claims.token_type,
+            sub: claims.sub,
             _marker: PhantomData,
         }
     }
@@ -64,6 +66,18 @@ impl BazaarToken {
 
     pub fn expires_at(&self) -> DateTime<Utc> {
         utc_from_timestamp(self.exp)
+    }
+
+    /// This method should only be called in the GraphQL Resolver in order to ensure
+    /// that the private ID is not leaked out publically (ie. to overwrite it)
+    ///
+    /// The public ID shouldn't be used anywhere else within the application
+    pub fn public_id(&self) -> Uuid {
+        if let Some(id) = self.sub {
+            return id;
+        }
+        warn!(public_id = ?self.sub, id = ?self.id, "expected to have valid ID mappings");
+        Uuid::nil()
     }
 }
 

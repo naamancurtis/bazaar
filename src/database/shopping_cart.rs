@@ -29,12 +29,14 @@ pub trait ShoppingCartRepository {
         items_array: serde_json::Value,
         pool: &PgPool,
     ) -> Result<ShoppingCart>;
+    async fn update_cart_type(id: Uuid, cart_type: CartType, pool: &PgPool) -> Result<Uuid>;
 }
 
 pub struct ShoppingCartDatabase;
 
 #[async_trait]
 impl ShoppingCartRepository for ShoppingCartDatabase {
+    #[tracing::instrument(skip(pool), fields(repository = "shopping_cart"))]
     async fn find_by_id(id: Uuid, pool: &PgPool) -> Result<ShoppingCart> {
         let cart = query_as!(
             SqlxShoppingCart,
@@ -55,6 +57,7 @@ impl ShoppingCartRepository for ShoppingCartDatabase {
         Ok(cart.into())
     }
 
+    #[tracing::instrument(skip(pool), fields(repository = "shopping_cart"))]
     async fn find_by_customer_id(id: Uuid, pool: &PgPool) -> Result<ShoppingCart> {
         let cart = query_as!(
             SqlxShoppingCart,
@@ -75,6 +78,7 @@ impl ShoppingCartRepository for ShoppingCartDatabase {
         Ok(cart.into())
     }
 
+    #[tracing::instrument(skip(pool), fields(repository = "shopping_cart"))]
     async fn find_cart_id_by_customer_id(id: Uuid, pool: &PgPool) -> Result<Uuid> {
         let cart_id = query!(
             r#"
@@ -87,6 +91,7 @@ impl ShoppingCartRepository for ShoppingCartDatabase {
         Ok(cart_id.id)
     }
 
+    #[tracing::instrument(skip(pool), fields(repository = "shopping_cart"))]
     async fn create_new_cart(
         id: Uuid,
         customer_id: Option<Uuid>,
@@ -117,6 +122,7 @@ impl ShoppingCartRepository for ShoppingCartDatabase {
         Ok(cart.into())
     }
 
+    #[tracing::instrument(skip(pool), fields(repository = "shopping_cart"))]
     async fn update_cart(
         cart: &ShoppingCart,
         items_array: Value,
@@ -144,5 +150,22 @@ impl ShoppingCartRepository for ShoppingCartDatabase {
         .fetch_one(pool)
         .await?;
         Ok(cart.into())
+    }
+
+    #[tracing::instrument(skip(pool), fields(repository = "shopping_cart"))]
+    async fn update_cart_type(id: Uuid, cart_type: CartType, pool: &PgPool) -> Result<Uuid> {
+        let cart = query!(
+            r#"
+            UPDATE shopping_carts
+            SET cart_type = $1
+            WHERE id = $2
+            RETURNING id
+            "#,
+            cart_type as CartType,
+            id
+        )
+        .fetch_one(pool)
+        .await?;
+        Ok(cart.id)
     }
 }

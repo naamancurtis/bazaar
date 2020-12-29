@@ -2,13 +2,9 @@ use anyhow::Result;
 use sqlx::{Connection, Executor, PgConnection, PgPool};
 use uuid::Uuid;
 
-use crate::helpers::IdHolder;
+use crate::helpers::CustomerData;
 
-use bazaar::{
-    configuration::DatabaseSettings,
-    database::{CustomerDatabase, ShoppingCartDatabase},
-    models::{Currency, Customer},
-};
+use bazaar::{configuration::DatabaseSettings, database::CustomerDatabase, models::Customer};
 
 pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
     let mut connection = PgConnection::connect_with(&config.without_db())
@@ -34,36 +30,29 @@ pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
     pool
 }
 
-pub async fn insert_default_customer(pool: &PgPool) -> Result<IdHolder> {
-    let email = format!("{}@test.com", Uuid::nil());
-    let first_name = Uuid::nil().to_string();
-    let last_name = Uuid::nil().to_string();
-    let password = Uuid::nil().to_string();
-
-    let customer =
-        Customer::new::<CustomerDatabase>(email, password, first_name, last_name, pool).await?;
-    Ok(IdHolder {
-        customer: Some(customer),
-        cart: None,
-    })
-}
-
-pub async fn insert_default_customer_with_cart(pool: &PgPool) -> Result<IdHolder> {
-    let email = format!("{}@test.com", Uuid::nil());
-    let first_name = Uuid::nil().to_string();
-    let last_name = Uuid::nil().to_string();
-    let password = Uuid::nil().to_string();
-    let customer =
-        Customer::new::<CustomerDatabase>(email, password, first_name, last_name, pool).await?;
-
-    let cart = Customer::add_new_cart::<CustomerDatabase, ShoppingCartDatabase>(
-        customer,
-        Currency::GBP,
+/// Inserts a new customer
+///
+/// Creates a new entry for this customer in:
+/// 1. Auth Table
+/// 2. Customers Table
+/// 3. Shopping Carts Table
+pub async fn insert_default_customer(pool: &PgPool) -> Result<CustomerData> {
+    let mut customer = CustomerData {
+        id: None,
+        cart_id: Some(Uuid::new_v4()),
+        email: Some("imbatman@test.com".to_string()),
+        password: Some("Passw0rd".to_string()),
+    };
+    let ids = Customer::new::<CustomerDatabase>(
+        Uuid::new_v4(),
+        customer.email.clone().unwrap(),
+        customer.password.clone().unwrap(),
+        "Bruce".to_string(),
+        "Wayne".to_string(),
+        customer.cart_id.clone().unwrap(),
         pool,
     )
     .await?;
-    Ok(IdHolder {
-        customer: Some(customer),
-        cart: Some(cart.id),
-    })
+    customer.id = Some(ids.public_id);
+    Ok(customer)
 }

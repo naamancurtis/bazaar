@@ -12,6 +12,7 @@ use crate::{
     graphql::{extract_token_and_database_pool, validators::ValidCustomerUpdateType},
     models::{
         cart_item::{InternalCartItem, UpdateCartItem},
+        shopping_cart::CartType,
         Currency, Customer, CustomerType, CustomerUpdate, ShoppingCart, TokenType,
     },
     BazaarError,
@@ -101,7 +102,12 @@ impl MutationRoot {
             .await
             .map_err(|e| e.extend())?;
         let cart_id = if let Ok(token) = token {
-            token.cart_id
+            ShoppingCart::update_cart_type::<ShoppingCartDatabase>(
+                token.cart_id,
+                CartType::Known,
+                pool,
+            )
+            .await?
         } else {
             Uuid::new_v4()
         };

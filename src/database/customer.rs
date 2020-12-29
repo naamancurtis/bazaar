@@ -88,12 +88,13 @@ impl CustomerRepository for CustomerDatabase {
 
         query!(
             r#"
-            INSERT INTO auth (public_id, id, password_hash)
-            VALUES ($1, $2, $3)
+            INSERT INTO auth (public_id, id, password_hash, email)
+            VALUES ($1, $2, $3, $4)
         "#,
             customer.public_id,
             customer.private_id,
-            customer.password_hash
+            customer.password_hash,
+            customer.email
         )
         .execute(&mut tx)
         .await?;

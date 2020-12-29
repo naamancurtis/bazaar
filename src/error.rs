@@ -18,6 +18,9 @@ pub enum BazaarError {
     #[error("Incorrect credentials provided")]
     IncorrectCredentials,
 
+    #[error("Anonymous users do not have access to this resource")]
+    AnonymousError,
+
     #[error("Bad Request: {0}")]
     BadRequest(String),
 
@@ -50,7 +53,7 @@ impl ErrorExtensions for BazaarError {
                     e.set("statusText", "BAD_REQUEST");
                     e.set("details", error.to_string());
                 }
-                Self::Unauthorized | Self::IncorrectCredentials => {
+                Self::Unauthorized | Self::IncorrectCredentials | Self::AnonymousError => {
                     e.set("status", 401);
                     e.set("statusText", "UNAUTHORIZED");
                 }
