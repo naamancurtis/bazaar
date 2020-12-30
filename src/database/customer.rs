@@ -16,6 +16,7 @@ use crate::{
 pub trait CustomerRepository {
     async fn create_new_user(
         customer: NewCustomer,
+        create_new_cart: bool,
         currency: Currency,
         pool: &PgPool,
     ) -> Result<()>;
@@ -81,6 +82,7 @@ impl CustomerRepository for CustomerDatabase {
     #[tracing::instrument(skip(pool, customer), fields(repository = "customer"))]
     async fn create_new_user(
         customer: NewCustomer,
+        create_new_cart: bool,
         currency: Currency,
         pool: &PgPool,
     ) -> Result<()> {
@@ -113,18 +115,32 @@ impl CustomerRepository for CustomerDatabase {
         .execute(&mut tx)
         .await?;
 
-        query!(
-            r#"
+        if create_new_cart {
+            query!(
+                r#"
             INSERT INTO shopping_carts (id, customer_id, cart_type, currency)
             VALUES ( $1, $2, $3, $4)
             "#,
-            customer.cart_id,
-            customer.private_id,
-            CartType::Known as CartType,
-            Currency::GBP as Currency
-        )
-        .execute(&mut tx)
-        .await?;
+                customer.cart_id,
+                customer.private_id,
+                CartType::Known as CartType,
+                Currency::GBP as Currency
+            )
+            .execute(&mut tx)
+            .await?;
+        } else {
+            query!(
+                r#"
+                UPDATE shopping_carts
+                SET cart_type = $1
+                WHERE id = $2
+                "#,
+                CartType::Known as CartType,
+                customer.cart_id,
+            )
+            .execute(&mut tx)
+            .await?;
+        }
 
         tx.commit().await?;
         Ok(())

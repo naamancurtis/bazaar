@@ -115,6 +115,7 @@ impl ResponseError for BazaarError {
     }
 }
 
+// @TODO add more precise match for `Unique constraint violated` error (ie. customer already exists)
 impl From<sqlx::Error> for BazaarError {
     fn from(e: sqlx::Error) -> BazaarError {
         use sqlx::Error::*;

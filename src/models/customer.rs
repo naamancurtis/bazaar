@@ -77,27 +77,32 @@ impl Customer {
         password: String,
         first_name: String,
         last_name: String,
-        cart_id: Uuid,
+        cart_id: Option<Uuid>,
         pool: &PgPool,
     ) -> Result<CustomerIds> {
         let public_id = Uuid::new_v4();
         let password_hash = auth::hash_password(&password)?;
+        let shopping_cart_id = if let Some(id) = cart_id {
+            id
+        } else {
+            Uuid::new_v4()
+        };
 
         let new_customer = NewCustomer {
             public_id,
             private_id: id,
-            cart_id,
+            cart_id: shopping_cart_id,
             email,
             password_hash,
             first_name,
             last_name,
         };
 
-        DB::create_new_user(new_customer, Currency::GBP, pool).await?;
+        DB::create_new_user(new_customer, cart_id.is_none(), Currency::GBP, pool).await?;
         Ok(CustomerIds {
             public_id,
             id,
-            cart_id,
+            cart_id: shopping_cart_id,
         })
     }
 

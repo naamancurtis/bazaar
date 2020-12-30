@@ -39,7 +39,7 @@ pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
 pub async fn insert_default_customer(pool: &PgPool) -> Result<CustomerData> {
     let mut customer = CustomerData {
         id: None,
-        cart_id: Some(Uuid::new_v4()),
+        cart_id: None,
         email: Some("imbatman@test.com".to_string()),
         password: Some("Passw0rd".to_string()),
     };
@@ -49,10 +49,11 @@ pub async fn insert_default_customer(pool: &PgPool) -> Result<CustomerData> {
         customer.password.clone().unwrap(),
         "Bruce".to_string(),
         "Wayne".to_string(),
-        customer.cart_id.clone().unwrap(),
+        None,
         pool,
     )
     .await?;
     customer.id = Some(ids.public_id);
+    customer.cart_id = Some(ids.cart_id);
     Ok(customer)
 }

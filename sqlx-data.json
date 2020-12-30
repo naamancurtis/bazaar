@@ -800,6 +800,29 @@
       "nullable": []
     }
   },
+  "f2b124167500ea26e9971839c85e54f1d4862686cdad59c614bf73f9e415c20c": {
+    "query": "\n                UPDATE shopping_carts\n                SET cart_type = $1\n                WHERE id = $2\n                ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          {
+            "Custom": {
+              "name": "user_cart_type",
+              "kind": {
+                "Enum": [
+                  "ANONYMOUS",
+                  "KNOWN"
+                ]
+              }
+            }
+          },
+          "Uuid"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "fbb5f7f000ca669ae6b041445ec2a3a7a5efe68fc17727f22a38dea523d02116": {
     "query": "\n            INSERT INTO shopping_carts (id, customer_id, cart_type, currency)\n            VALUES ( $1, $2, $3, $4)\n            ",
     "describe": {

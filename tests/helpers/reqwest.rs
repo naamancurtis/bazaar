@@ -5,15 +5,18 @@ use reqwest::{
 };
 use serde_json::Value;
 
-pub async fn send_request(address: &str, token: &str, body: Value) -> Result<Value> {
+pub async fn send_request(address: &str, token: Option<&str>, body: Value) -> Result<Value> {
     let client = Client::new();
-    let access_token = format!("Bearer {}", token);
-    let response = client
-        .post(address)
-        .header(AUTHORIZATION, HeaderValue::from_str(&access_token)?)
-        .json(&body)
-        .send()
-        .await?;
+    let access_token = if let Some(token) = token {
+        format!("Bearer {}", token)
+    } else {
+        String::default()
+    };
+    let mut request = client.post(address);
+    if !access_token.is_empty() {
+        request = request.header(AUTHORIZATION, HeaderValue::from_str(&access_token)?);
+    }
+    let response = request.json(&body).send().await?;
     let data = response.json::<serde_json::Value>().await?;
     eprintln!("{:#?}", &data);
     Ok(data)

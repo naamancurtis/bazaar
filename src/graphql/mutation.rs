@@ -12,7 +12,6 @@ use crate::{
     graphql::{extract_token_and_database_pool, validators::ValidCustomerUpdateType},
     models::{
         cart_item::{InternalCartItem, UpdateCartItem},
-        shopping_cart::CartType,
         Currency, Customer, CustomerType, CustomerUpdate, ShoppingCart, TokenType,
     },
     BazaarError,
@@ -101,16 +100,24 @@ impl MutationRoot {
         let (pool, token) = extract_token_and_database_pool(ctx, TokenType::Access)
             .await
             .map_err(|e| e.extend())?;
+
+        // Need to know whether to create a new cart, or update an existing one
         let cart_id = if let Ok(token) = token {
-            ShoppingCart::update_cart_type::<ShoppingCartDatabase>(
-                token.cart_id,
-                CartType::Known,
-                pool,
-            )
-            .await?
+            if token.customer_type == CustomerType::Known {
+                error!(
+                    err = "signed up customer with valid token hit sign up mutation",
+                    id = ?token.id.unwrap_or_default(),
+                    "customer already has valid tokens"
+                );
+                return Err(
+                    BazaarError::BadRequest("Customer already exists".to_string()).extend(),
+                );
+            }
+            Some(token.cart_id)
         } else {
-            Uuid::new_v4()
+            None
         };
+
         let ids = Customer::new::<CustomerDatabase>(
             Uuid::new_v4(),
             email,

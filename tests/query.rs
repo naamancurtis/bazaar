@@ -25,7 +25,7 @@ async fn query_customer_fails_for_anonymous_user() -> Result<()> {
         "query": graphql_mutatation,
     });
 
-    let data = send_request(&app.address, &tokens.tokens.access_token, body).await?;
+    let data = send_request(&app.address, Some(&tokens.tokens.access_token), body).await?;
 
     let errors = data["errors"].clone();
     assert_json_include!(
@@ -61,7 +61,7 @@ async fn query_customer_works_for_known_user() -> Result<()> {
         "query": graphql_mutatation,
     });
 
-    let data = send_request(&app.address, &tokens.tokens.access_token, body).await?;
+    let data = send_request(&app.address, Some(&tokens.tokens.access_token), body).await?;
     let data = data["data"]["customer"].clone();
     assert_json_include!(
         actual: data,
@@ -98,7 +98,7 @@ async fn query_customer_with_known_user_includes_cart() -> Result<()> {
         "query": graphql_mutatation,
     });
 
-    let data = send_request(&app.address, &tokens.tokens.access_token, body).await?;
+    let data = send_request(&app.address, Some(&tokens.tokens.access_token), body).await?;
     let data = data["data"]["customer"].clone();
     assert_json_include!(
         actual: data,
@@ -140,7 +140,7 @@ async fn query_cart_works_for_anonymous_user() -> Result<()> {
         "query": graphql_mutatation,
     });
 
-    let data = send_request(&app.address, &tokens.tokens.access_token, body).await?;
+    let data = send_request(&app.address, Some(&tokens.tokens.access_token), body).await?;
     let data = data["data"]["cart"].clone();
 
     assert_json_include!(
@@ -178,7 +178,7 @@ async fn query_cart_works_for_known_user() -> Result<()> {
         "query": graphql_mutatation,
     });
 
-    let data = send_request(&app.address, &tokens.tokens.access_token, body).await?;
+    let data = send_request(&app.address, Some(&tokens.tokens.access_token), body).await?;
     let data = data["data"]["cart"].clone();
 
     assert_json_include!(

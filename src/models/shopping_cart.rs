@@ -215,14 +215,13 @@ impl From<SqlxShoppingCart> for ShoppingCart {
     }
 }
 
+/// This Resolver should never return `customer_id`, as the customer id
+/// stored within the table is the **private** one, and should never be
+/// publically exposed
 #[Object]
 impl ShoppingCart {
     async fn id(&self) -> Uuid {
         self.id
-    }
-
-    async fn customer_id(&self) -> Option<Uuid> {
-        self.customer_id
     }
 
     async fn cart_type(&self) -> CartType {
