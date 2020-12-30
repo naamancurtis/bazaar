@@ -135,7 +135,7 @@ impl MutationRoot {
         generate_tokens(Some(ids.public_id), ids.cart_id).map_err(|e| e.extend())
     }
 
-    #[tracing::instrument(skip(self, ctx))]
+    #[tracing::instrument(skip(self, ctx, update))]
     async fn update_customer(
         &self,
         ctx: &Context<'_>,
@@ -144,7 +144,8 @@ impl MutationRoot {
         let (pool, token) = extract_token_and_database_pool(ctx, TokenType::Access)
             .await
             .map_err(|e| e.extend())?;
-        if let Some(id) = token?.id {
+        let token = token.map_err(|e| e.extend())?;
+        if let Some(id) = token.id {
             return Customer::update::<CustomerDatabase>(id, update, pool)
                 .await
                 .map_err(|err| {
@@ -152,7 +153,7 @@ impl MutationRoot {
                     err.extend()
                 });
         }
-        Err(BazaarError::Unauthorized.extend())
+        Err(BazaarError::AnonymousError.extend())
     }
 
     #[tracing::instrument(skip(self, ctx))]

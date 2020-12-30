@@ -1,6 +1,6 @@
 use async_graphql::Context;
 use sqlx::PgPool;
-use tracing::error;
+use tracing::{error, warn};
 
 use crate::{
     database::AuthDatabase,
@@ -24,9 +24,15 @@ pub async fn extract_token(
     token_type: TokenType,
     pool: &PgPool,
 ) -> Result<BazaarToken> {
-    let token = context
-        .data::<BearerToken>()
-        .map_err(|_| BazaarError::InvalidToken("Token was malformed or not found".to_owned()))?;
+    let token = context.data::<BearerToken>().map_err(|e| {
+        if e.message.contains("does not exist") {
+            warn!("no token was found");
+            BazaarError::InvalidToken("No token was found".to_string())
+        } else {
+            warn!("token was malformed");
+            BazaarError::InvalidToken("Token was malformed".to_string())
+        }
+    })?;
     parse_and_deserialize_token::<AuthDatabase>(token.clone(), token_type, pool).await
 }
 

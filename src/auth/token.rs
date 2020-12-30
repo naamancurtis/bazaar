@@ -26,6 +26,7 @@ pub struct BazaarTokens {
     pub refresh_token_expires_in: i64,
 }
 
+#[tracing::instrument]
 pub fn generate_tokens(
     // This should always be the **public** id, never the private one
     id: Option<Uuid>,

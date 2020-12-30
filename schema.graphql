@@ -22,11 +22,6 @@ Implement the DateTime<Utc> scalar
 The input/output is a string in RFC3339 format.
 """
 scalar DateTime
-"""
-This Resolver should never return `customer_id`, as the customer id
-stored within the table is the **private** one, and should never be
-publically exposed
-"""
 type ShoppingCart {
 	id: UUID!
 	cartType: CartType!

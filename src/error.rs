@@ -2,7 +2,7 @@ use actix_web::{error::ResponseError, HttpResponse};
 use async_graphql::ErrorExtensions;
 use serde::Serialize;
 use thiserror::Error;
-use tracing::{error, warn};
+use tracing::error;
 
 #[derive(Debug, Error, PartialEq)]
 pub enum BazaarError {
@@ -45,42 +45,39 @@ pub enum BazaarError {
 
 impl ErrorExtensions for BazaarError {
     fn extend(&self) -> async_graphql::Error {
-        async_graphql::Error::new(format!("{}", self)).extend_with(|err, e| {
-            warn!(?err, ?e, "from errors.rs looking at async");
-            match self {
-                Self::BadRequest(error) => {
-                    e.set("status", 400);
-                    e.set("statusText", "BAD_REQUEST");
-                    e.set("details", error.to_string());
-                }
-                Self::Unauthorized | Self::IncorrectCredentials | Self::AnonymousError => {
-                    e.set("status", 401);
-                    e.set("statusText", "UNAUTHORIZED");
-                }
-                Self::InvalidToken(error) => {
-                    e.set("status", 401);
-                    e.set("statusText", "INVALID_TOKEN");
-                    e.set("details", error.to_string());
-                }
-                Self::Forbidden => {
-                    e.set("status", 403);
-                    e.set("statusText", "FORBIDDEN");
-                }
-                Self::NotFound => {
-                    e.set("status", 404);
-                    e.set("statusText", "NOT_FOUND");
-                }
-                Self::ServerError(error) => {
-                    e.set("status", 500);
-                    e.set("statusText", "SERVER_ERROR");
-                    e.set("context", error.to_string());
-                }
-                Self::UnexpectedError => {
-                    e.set("status", 500);
-                    e.set("statusText", "SERVER_ERROR");
-                }
-                _ => {}
+        async_graphql::Error::new(format!("{}", self)).extend_with(|_, e| match self {
+            Self::BadRequest(error) => {
+                e.set("status", 400);
+                e.set("statusText", "BAD_REQUEST");
+                e.set("details", error.to_string());
             }
+            Self::Unauthorized | Self::IncorrectCredentials | Self::AnonymousError => {
+                e.set("status", 401);
+                e.set("statusText", "UNAUTHORIZED");
+            }
+            Self::InvalidToken(error) => {
+                e.set("status", 401);
+                e.set("statusText", "INVALID_TOKEN");
+                e.set("details", error.to_string());
+            }
+            Self::Forbidden => {
+                e.set("status", 403);
+                e.set("statusText", "FORBIDDEN");
+            }
+            Self::NotFound => {
+                e.set("status", 404);
+                e.set("statusText", "NOT_FOUND");
+            }
+            Self::ServerError(error) => {
+                e.set("status", 500);
+                e.set("statusText", "SERVER_ERROR");
+                e.set("context", error.to_string());
+            }
+            Self::UnexpectedError => {
+                e.set("status", 500);
+                e.set("statusText", "SERVER_ERROR");
+            }
+            _ => {}
         })
     }
 }

@@ -146,7 +146,7 @@ impl CustomerRepository for CustomerDatabase {
         Ok(())
     }
 
-    #[tracing::instrument(skip(pool), fields(repository = "customer"))]
+    #[tracing::instrument(skip(pool, update), fields(repository = "customer"))]
     async fn update(id: Uuid, update: Vec<CustomerUpdate>, pool: &PgPool) -> Result<()> {
         let mut tx = pool.begin().await?;
         let updates: Vec<(&str, String)> = update

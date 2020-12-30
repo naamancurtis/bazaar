@@ -78,6 +78,7 @@ pub fn encode_token(
     encode_jwt(&claims, token_type)
 }
 
+#[tracing::instrument]
 pub(crate) fn encode_jwt(claims: &Claims, token_type: TokenType) -> Result<String, BazaarError> {
     let headers = Header::new(Algorithm::PS256);
     let key = if token_type == TokenType::Access {
