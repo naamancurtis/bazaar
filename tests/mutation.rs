@@ -12,6 +12,27 @@ use bazaar::{
 mod helpers;
 use helpers::*;
 
+// assert_json_include!(
+//     actual: &data,
+//     expected: json!({
+//         "id": customer_details.id.unwrap(),
+//         "email": customer_details.email.unwrap(),
+//         "firstName": "Bruce",
+//         "lastName": "Wayne",
+//         "cart" :{
+//             "id": customer_details.cart_id.unwrap(),
+//             "currency": "GBP",
+//             "cartType": "KNOWN",
+//             "items": [{
+//                 "sku": "12345678",
+//                 "quantity": 3,
+//                 "name": "Item 1",
+//                 "tags": []
+//             }],
+//         }
+//     })
+// );
+
 #[actix_rt::test]
 async fn mutation_create_customer_works() -> Result<()> {
     let app = spawn_app().await;
