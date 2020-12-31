@@ -8,6 +8,12 @@ jobs:
     environment:
       # Fail the build if there are warnings
       RUSTFLAGS: "-D warnings"
+      SECRET_KEY: $SECRET_KEY
+      SALT: $SALT
+      ACCESS_TOKEN_PRIVATE_KEY: $ACCESS_TOKEN_PRIVATE_KEY
+      ACCESS_TOKEN_PUBLIC_KEY: $ACCESS_TOKEN_PUBLIC_KEY
+      REFRESH_TOKEN_PRIVATE_KEY: $REFRESH_TOKEN_PRIVATE_KEY
+      REFRESH_TOKEN_PUBLIC_KEY: $REFRESH_TOKEN_PUBLIC_KEY
     steps:
       - checkout
       - run:

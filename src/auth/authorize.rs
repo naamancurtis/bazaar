@@ -23,28 +23,28 @@ lazy_static! {
             error!(err = ?e, "failed to retrieve access token private key");
             panic!("no access token private key was provided");
         });
-        key.unwrap()
+        key.expect("[ENV VAR] ACCESS_TOKEN_PRIVATE_KEY failed")
     };
     static ref ACCESS_TOKEN_PUBLIC_KEY: String = {
         let key = env::var("ACCESS_TOKEN_PUBLIC_KEY").map_err(|e| {
             error!(err = ?e, "failed to retrieve access token public key");
             panic!("no access token public key was provided");
         });
-        key.unwrap()
+        key.expect("[ENV VAR] ACCESS_TOKEN_PUBLIC_KEY failed")
     };
     static ref REFRESH_TOKEN_PRIVATE_KEY: String = {
         let key = env::var("REFRESH_TOKEN_PRIVATE_KEY").map_err(|e| {
             error!(err = ?e, "failed to retrieve refresh token private key");
             panic!("no refresh token private key was provided");
         });
-        key.unwrap()
+        key.expect("[ENV VAR] REFRESH_TOKEN_PRIVATE_KEY failed")
     };
     static ref REFRESH_TOKEN_PUBLIC_KEY: String = {
         let key = env::var("REFRESH_TOKEN_PUBLIC_KEY").map_err(|e| {
             error!(err = ?e, "failed to retrieve refresh token public key");
             panic!("no refresh token public key was provided");
         });
-        key.unwrap()
+        key.expect("[ENV VAR] REFRESH_TOKEN_PUBLIC_KEY failed")
     };
 }
 
