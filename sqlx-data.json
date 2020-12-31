@@ -703,21 +703,6 @@
       "nullable": []
     }
   },
-  "bcea3bb7c7a9ca03aae6c5940802c07aa9576bfd21653cb2ad467a09eb68e86e": {
-    "query": "\n            INSERT INTO customers ( id, email, first_name, last_name )\n            VALUES ( $1, $2, $3, $4 )\n            ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Text",
-          "Text",
-          "Text"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "dba04fb90d6770fe4e38f818a71cda0341b9194ca6d6bd62f8745a8811bb11e0": {
     "query": "\n            UPDATE customers\n            SET cart_id = $1\n            WHERE id = $2;\n            ",
     "describe": {
