@@ -2,6 +2,7 @@
 mod app;
 mod constants;
 mod database;
+mod env_vars;
 mod graphql;
 mod math;
 mod reqwest;
@@ -12,6 +13,7 @@ pub use self::reqwest::*;
 pub use app::{spawn_app, IdHolder, TestApp};
 pub use constants::*;
 pub use database::*;
+pub use env_vars::set_env_vars_for_tests;
 pub use graphql::parse_graphql_response;
 pub use math::assert_on_decimal;
 pub use tokens::*;

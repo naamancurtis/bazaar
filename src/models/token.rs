@@ -160,7 +160,10 @@ mod tests {
     use async_trait::async_trait;
     use claim::{assert_err, assert_some};
 
-    use crate::{models::auth::AuthCustomer, test_helpers::create_valid_jwt_token};
+    use crate::{
+        models::auth::AuthCustomer,
+        test_helpers::{create_valid_jwt_token, set_token_env_vars_for_tests},
+    };
 
     struct MockAuthRepo;
 
@@ -177,6 +180,7 @@ mod tests {
 
     #[tokio::test]
     async fn correctly_parses_valid_token() {
+        set_token_env_vars_for_tests();
         let (token, claims) = create_valid_jwt_token(TokenType::Access);
         let jwt = format!("Bearer {}", token);
         let jwt = BearerToken::try_from(jwt).expect("should provide a valid token");
@@ -193,6 +197,7 @@ mod tests {
 
     #[test]
     fn rejects_a_malformed_bearer_token() {
+        set_token_env_vars_for_tests();
         let (token, _) = create_valid_jwt_token(TokenType::Access);
         let jwt = format!("Berer {}", token);
         let result = BearerToken::try_from(jwt);
@@ -209,6 +214,7 @@ mod tests {
 
     #[test]
     fn rejects_when_no_token_is_provided() {
+        set_token_env_vars_for_tests();
         let jwt = format!("Bearer {}", "".to_string());
         let result = BearerToken::try_from(jwt);
         assert_err!(&result);
@@ -222,6 +228,7 @@ mod tests {
 
     #[tokio::test]
     async fn rejects_an_invalid_token_token() {
+        set_token_env_vars_for_tests();
         let jwt = format!(
             "Bearer {}",
             "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c".to_string()
