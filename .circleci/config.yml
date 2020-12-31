@@ -35,7 +35,7 @@ jobs:
           key: v1-cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
       - run:
           name: Run all tests
-          command: cargo test
+          command: cargo test -j 1
       - run:
           name: Check sqlx metadata file
           command: cargo sqlx prepare --check -- --lib
