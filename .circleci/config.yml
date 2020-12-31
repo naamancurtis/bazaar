@@ -1,6 +1,10 @@
 version: 2
 jobs:
   build-and-test:
+    # Given the size of the project now, linking fails due to not having enough
+    # memory on small & medium resource classes. Without going up to a paid tier
+    # resource class, the current way to work around this is to compile on a
+    # single thread - suffix `-j 1`. eg. `cargo build -j 1`
     resource_class: medium
     docker:
       - image: circleci/rust
@@ -8,12 +12,6 @@ jobs:
     environment:
       # Fail the build if there are warnings
       RUSTFLAGS: "-D warnings"
-      SECRET_KEY: $SECRET_KEY
-      SALT: $SALT
-      ACCESS_TOKEN_PRIVATE_KEY: $ACCESS_TOKEN_PRIVATE_KEY
-      ACCESS_TOKEN_PUBLIC_KEY: $ACCESS_TOKEN_PUBLIC_KEY
-      REFRESH_TOKEN_PRIVATE_KEY: $REFRESH_TOKEN_PRIVATE_KEY
-      REFRESH_TOKEN_PUBLIC_KEY: $REFRESH_TOKEN_PUBLIC_KEY
     steps:
       - checkout
       - run:

@@ -81,6 +81,10 @@ pub fn encode_token(
 #[tracing::instrument]
 pub(crate) fn encode_jwt(claims: &Claims, token_type: TokenType) -> Result<String, BazaarError> {
     let headers = Header::new(Algorithm::PS256);
+    dbg!(
+        &ACCESS_TOKEN_PUBLIC_KEY.to_string(),
+        &REFRESH_TOKEN_PUBLIC_KEY.to_string()
+    );
     let key = if token_type == TokenType::Access {
         ACCESS_TOKEN_PRIVATE_KEY.as_bytes()
     } else {
