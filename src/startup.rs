@@ -27,6 +27,7 @@ pub fn build_app(listener: TcpListener, connection: PgPool) -> Result<Server, st
             .wrap(TracingLogger)
             .data(schema.clone())
             .data(connection.clone())
+            .service(web::resource("/refresh").guard(guard::Post()).to(refresh))
             .service(web::resource("/").guard(guard::Post()).to(graphql_index))
             .service(
                 web::resource("/playground")

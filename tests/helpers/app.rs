@@ -2,7 +2,7 @@ use sqlx::PgPool;
 use std::net::TcpListener;
 use uuid::Uuid;
 
-use crate::helpers::{configure_database, TRACING};
+use crate::helpers::{configure_database, set_env_vars_for_tests, TRACING};
 
 pub struct TestApp {
     pub address: String,
@@ -14,14 +14,6 @@ pub struct IdHolder {
     pub cart: Option<Uuid>,
 }
 
-/// Just used to ensure environment variables that are required at runtime are
-/// set to something
-fn set_up_env_vars() {
-    use std::env::set_var;
-    set_var("SECRET_KEY", "TEST KEY");
-    set_var("SALT", "TEST SALT");
-}
-
 pub async fn spawn_app() -> TestApp {
     lazy_static::initialize(&TRACING);
 
@@ -29,7 +21,7 @@ pub async fn spawn_app() -> TestApp {
     let port = listener.local_addr().unwrap().port();
 
     let mut configuration = bazaar::get_configuration().expect("failed to read configuration");
-    set_up_env_vars();
+    set_env_vars_for_tests();
 
     let database_name = Uuid::new_v4().to_string();
     configuration.set_database_name(database_name);

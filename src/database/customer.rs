@@ -1,4 +1,3 @@
-use anyhow::Result;
 use async_trait::async_trait;
 use sqlx::{query, query_as, PgPool};
 use tracing::error;
@@ -6,18 +5,19 @@ use uuid::Uuid;
 
 use crate::{
     database::ShoppingCartDatabase,
-    models::{Currency, Customer, CustomerUpdate, ShoppingCart},
+    models::{
+        customer::NewCustomer, shopping_cart::CartType, Currency, Customer, CustomerUpdate,
+        ShoppingCart,
+    },
+    Result,
 };
 
 #[async_trait]
 pub trait CustomerRepository {
     async fn create_new_user(
-        public_id: Uuid,
-        id: Uuid,
-        email: &str,
-        password_hash: &str,
-        first_name: &str,
-        last_name: &str,
+        customer: NewCustomer,
+        create_new_cart: bool,
+        currency: Currency,
         pool: &PgPool,
     ) -> Result<()>;
     async fn find_all(pool: &PgPool) -> Result<Vec<Customer>>;
@@ -78,48 +78,75 @@ impl CustomerRepository for CustomerDatabase {
         Ok(customer)
     }
 
-    #[tracing::instrument(skip(pool, password_hash), fields(repository = "customer"))]
+    // Must not trace customer - includes password hash
+    #[tracing::instrument(skip(pool, customer), fields(repository = "customer"))]
     async fn create_new_user(
-        public_id: Uuid,
-        id: Uuid,
-        email: &str,
-        password_hash: &str,
-        first_name: &str,
-        last_name: &str,
+        customer: NewCustomer,
+        create_new_cart: bool,
+        currency: Currency,
         pool: &PgPool,
     ) -> Result<()> {
         let mut tx = pool.begin().await?;
 
         query!(
             r#"
-            INSERT INTO auth (public_id, id, password_hash)
-            VALUES ($1, $2, $3)
+            INSERT INTO auth (public_id, id, password_hash, email)
+            VALUES ($1, $2, $3, $4)
         "#,
-            public_id,
-            id,
-            password_hash
+            customer.public_id,
+            customer.private_id,
+            customer.password_hash,
+            customer.email
         )
         .execute(&mut tx)
         .await?;
 
         query!(
             r#"
-            INSERT INTO customers ( id, email, first_name, last_name )
-            VALUES ( $1, $2, $3, $4 )
+            INSERT INTO customers ( id, email, first_name, last_name, cart_id )
+            VALUES ( $1, $2, $3, $4, $5)
             "#,
-            id,
-            email,
-            first_name,
-            last_name,
+            customer.private_id,
+            customer.email,
+            customer.first_name,
+            customer.last_name,
+            customer.cart_id
         )
         .execute(&mut tx)
         .await?;
+
+        if create_new_cart {
+            query!(
+                r#"
+            INSERT INTO shopping_carts (id, customer_id, cart_type, currency)
+            VALUES ( $1, $2, $3, $4)
+            "#,
+                customer.cart_id,
+                customer.private_id,
+                CartType::Known as CartType,
+                Currency::GBP as Currency
+            )
+            .execute(&mut tx)
+            .await?;
+        } else {
+            query!(
+                r#"
+                UPDATE shopping_carts
+                SET cart_type = $1
+                WHERE id = $2
+                "#,
+                CartType::Known as CartType,
+                customer.cart_id,
+            )
+            .execute(&mut tx)
+            .await?;
+        }
 
         tx.commit().await?;
         Ok(())
     }
 
-    #[tracing::instrument(skip(pool), fields(repository = "customer"))]
+    #[tracing::instrument(skip(pool, update), fields(repository = "customer"))]
     async fn update(id: Uuid, update: Vec<CustomerUpdate>, pool: &PgPool) -> Result<()> {
         let mut tx = pool.begin().await?;
         let updates: Vec<(&str, String)> = update

@@ -1,8 +1,7 @@
 type QueryRoot {
 	customers: [Customer!]!
-	customerById(id: UUID!): Customer!
-	customerByEmail(email: String!): Customer!
-	cartById(id: UUID!): ShoppingCart!
+	customer: Customer!
+	cart: ShoppingCart!
 }
 """
 Graphql Resolver
@@ -25,7 +24,6 @@ The input/output is a string in RFC3339 format.
 scalar DateTime
 type ShoppingCart {
 	id: UUID!
-	customerId: UUID
 	cartType: CartType!
 	discounts: [UUID!]
 	priceBeforeDiscounts: Float!
@@ -53,12 +51,28 @@ type CartItem {
 	tags: [String!]!
 }
 type MutationRoot {
-	createCustomer(email: String!, password: String!, firstName: String!, lastName: String!): Customer!
-	updateCustomer(id: UUID!, update: [CustomerUpdate!]!): Customer!
-	createAnonymousCart(currency: Currency!): ShoppingCart!
-	createKnownCart(id: UUID!, currency: Currency!): ShoppingCart!
-	addItemsToCart(id: UUID!, newItems: [UpdateCartItem!]!): ShoppingCart!
-	removeItemsFromCart(id: UUID!, removedItems: [UpdateCartItem!]!): ShoppingCart!
+	login(email: String!, password: String!): BazaarTokens!
+	anonymousLogin: BazaarTokens!
+	signUp(email: String!, password: String!, firstName: String!, lastName: String!): BazaarTokens!
+	updateCustomer(update: [CustomerUpdate!]!): Customer!
+	addItemsToCart(newItems: [UpdateCartItem!]!): ShoppingCart!
+	removeItemsFromCart(removedItems: [UpdateCartItem!]!): ShoppingCart!
+}
+type BazaarTokens {
+	issuedAt: Int!
+	accessToken: String!
+	"""
+	Time until expiry (in seconds)
+	"""
+	accessTokenExpiresIn: Int!
+	"""
+	This token is automatically set in the cookies
+	"""
+	refreshToken: String!
+	"""
+	Time until expiry (in seconds)
+	"""
+	refreshTokenExpiresIn: Int!
 }
 input CustomerUpdate {
 key: String!

@@ -1,11 +1,10 @@
-use anyhow::Result;
 use async_graphql::{InputObject, SimpleObject};
 use serde::{Deserialize, Serialize};
 use sqlx::PgPool;
 use std::hash::{Hash, Hasher};
 use tracing::error;
 
-use crate::database::CartItemRepository;
+use crate::{database::CartItemRepository, Result};
 
 #[derive(Debug, SimpleObject, Deserialize, Clone)]
 pub struct CartItem {

@@ -1,4 +1,3 @@
-use anyhow::Result;
 use async_graphql::{Context, InputObject, Object};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -9,6 +8,7 @@ use crate::{
     auth,
     database::{CustomerRepository, ShoppingCartDatabase, ShoppingCartRepository},
     models::{Currency, ShoppingCart},
+    Result,
 };
 
 #[derive(Debug, Deserialize)]
@@ -27,6 +27,24 @@ pub struct Customer {
 pub struct CustomerUpdate {
     pub key: String,
     pub value: String,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub struct CustomerIds {
+    id: Uuid,
+    pub public_id: Uuid,
+    pub cart_id: Uuid,
+}
+
+#[derive(Debug)]
+pub struct NewCustomer {
+    pub public_id: Uuid,
+    pub private_id: Uuid,
+    pub cart_id: Uuid,
+    pub email: String,
+    pub password_hash: String,
+    pub first_name: String,
+    pub last_name: String,
 }
 
 impl Customer {
@@ -50,31 +68,42 @@ impl Customer {
 
     #[tracing::instrument(
         name = "new_customer",
-        skip(pool, password),
+        skip(pool, email, password, first_name, last_name),
         fields(model = "Customer")
     )]
     pub async fn new<DB: CustomerRepository>(
+        id: Uuid,
         email: String,
         password: String,
         first_name: String,
         last_name: String,
+        cart_id: Option<Uuid>,
         pool: &PgPool,
-    ) -> Result<Uuid> {
+    ) -> Result<CustomerIds> {
         let public_id = Uuid::new_v4();
-        let id = Uuid::new_v4();
         let password_hash = auth::hash_password(&password)?;
+        let shopping_cart_id = if let Some(id) = cart_id {
+            id
+        } else {
+            Uuid::new_v4()
+        };
 
-        DB::create_new_user(
+        let new_customer = NewCustomer {
+            public_id,
+            private_id: id,
+            cart_id: shopping_cart_id,
+            email,
+            password_hash,
+            first_name,
+            last_name,
+        };
+
+        DB::create_new_user(new_customer, cart_id.is_none(), Currency::GBP, pool).await?;
+        Ok(CustomerIds {
             public_id,
             id,
-            &email,
-            &password_hash,
-            &first_name,
-            &last_name,
-            pool,
-        )
-        .await?;
-        Ok(id)
+            cart_id: shopping_cart_id,
+        })
     }
 
     #[tracing::instrument(skip(pool), fields(model = "Customer"))]

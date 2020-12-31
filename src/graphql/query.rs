@@ -1,62 +1,64 @@
-use async_graphql::{validators::Email, Context, Error, Object, Result};
+use async_graphql::{Context, Error, ErrorExtensions, Object, Result};
 use sqlx::PgPool;
-use uuid::Uuid;
+use tracing::error;
 
 use crate::{
     database::{CustomerDatabase, ShoppingCartDatabase},
-    error::generate_error_log,
-    models::{Customer, ShoppingCart},
+    graphql::extract_token_and_database_pool,
+    models::{Customer, CustomerType, ShoppingCart, TokenType},
+    BazaarError,
 };
 
 pub struct QueryRoot;
 
 #[Object]
 impl QueryRoot {
+    // @TODO Remove this - only here for QoL while developing
     #[tracing::instrument(name = "get_customers", skip(self, ctx))]
     async fn customers(&self, ctx: &Context<'_>) -> Result<Vec<Customer>> {
         let pool = ctx.data::<PgPool>()?;
         Customer::find_all::<CustomerDatabase>(pool)
             .await
             .map_err(|err| {
-                generate_error_log(err, None);
+                error!(?err, "failed to fetch all customers");
                 Error::new("unable to fetch customers")
             })
     }
 
     #[tracing::instrument(skip(self, ctx))]
-    async fn customer_by_id(&self, ctx: &Context<'_>, id: Uuid) -> Result<Customer> {
-        let pool = ctx.data::<PgPool>()?;
-        Customer::find_by_id::<CustomerDatabase>(id, pool)
+    async fn customer<'ctx>(&self, ctx: &'ctx Context<'_>) -> Result<Customer> {
+        let (pool, token) = extract_token_and_database_pool(ctx, TokenType::Access)
             .await
-            .map_err(|err| {
-                generate_error_log(err, None);
-                Error::new("unable to find customer")
-            })
+            .map_err(|e| e.extend())?;
+        let token = token?;
+
+        if let Some(id) = token.id {
+            let mut customer = Customer::find_by_id::<CustomerDatabase>(id, pool)
+                .await
+                .map_err(|err| {
+                    error!(?err, "failed to find customer");
+                    BazaarError::NotFound.extend()
+                })?;
+            customer.id = token.public_id();
+            return Ok(customer);
+        }
+        if token.customer_type == CustomerType::Anonymous {
+            return Err(BazaarError::AnonymousError.extend());
+        }
+        Err(BazaarError::Unauthorized.extend())
     }
 
     #[tracing::instrument(skip(self, ctx))]
-    async fn customer_by_email(
-        &self,
-        ctx: &Context<'_>,
-        #[graphql(validator(Email))] email: String,
-    ) -> Result<Customer> {
-        let pool = ctx.data::<PgPool>()?;
-        Customer::find_by_email::<CustomerDatabase>(email, pool)
+    async fn cart(&self, ctx: &Context<'_>) -> Result<ShoppingCart> {
+        let (pool, token) = extract_token_and_database_pool(ctx, TokenType::Access)
             .await
-            .map_err(|err| {
-                generate_error_log(err, None);
-                Error::new("unable to find customer")
-            })
-    }
+            .map_err(|e| e.extend())?;
 
-    #[tracing::instrument(skip(self, ctx))]
-    async fn cart_by_id(&self, ctx: &Context<'_>, id: Uuid) -> Result<ShoppingCart> {
-        let pool = ctx.data::<PgPool>()?;
-        ShoppingCart::find_by_id::<ShoppingCartDatabase>(id, pool)
+        ShoppingCart::find_by_id::<ShoppingCartDatabase>(token?.cart_id, pool)
             .await
             .map_err(|err| {
-                generate_error_log(err, None);
-                Error::new("unable to find cart")
+                error!(?err, "failed to find customer's cart");
+                err.extend()
             })
     }
 }

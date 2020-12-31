@@ -94,6 +94,58 @@
       ]
     }
   },
+  "224b62a4a889ad814b8473dcc4a034676d582842756ba53e75694a00160bae9b": {
+    "query": "\n            SELECT public_id, id, password_hash FROM auth WHERE email = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "public_id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "password_hash",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  },
+  "35372639a046ab0701f8171886655da053f73f6f675ee0d057f5a97d3a2623fe": {
+    "query": "\n            SELECT id FROM shopping_carts WHERE customer_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "3cfcc6ae1e35b0f4b3c0410b8ee5a56e6a88de8eeb91e7d431f49e69341e1759": {
     "query": "\n            UPDATE shopping_carts\n            SET price_before_discounts = $1, price_after_discounts = $2, items = $3::jsonb\n            WHERE id = $4\n            RETURNING \n                id, customer_id, \n                cart_type as \"cart_type!: CartType\", \n                items as \"items!: Json<Vec<InternalCartItem>>\",\n                currency as \"currency!: Currency\",\n                discounts, price_before_discounts, price_after_discounts,\n                created_at, last_modified\n            ",
     "describe": {
@@ -191,6 +243,26 @@
       ]
     }
   },
+  "4a9afd3d5b773e061ae419b3471666e65bbf0877a2ff0f9cfbcf69ad5f2849a2": {
+    "query": "\n            SELECT id FROM auth WHERE public_id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false
+      ]
+    }
+  },
   "52c254bfa828472a448ba23bc2eafe77c4337ce645cc61443b997eeb4f7fc74f": {
     "query": "\n            SELECT * FROM customers WHERE id = $1\n            ",
     "describe": {
@@ -244,26 +316,6 @@
         false,
         false,
         true
-      ]
-    }
-  },
-  "62b40b2e35fcbefdda5a92f0e995e27135cca092b6e7380505af1d0984d36d22": {
-    "query": "\n            SELECT password_hash FROM auth WHERE public_id = $1\n        ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "password_hash",
-          "type_info": "Text"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Uuid"
-        ]
-      },
-      "nullable": [
-        false
       ]
     }
   },
@@ -417,20 +469,6 @@
       ]
     }
   },
-  "738b62ddb898e382403250f597908591338d082fe14cb788ddbc8b3921ea8ce6": {
-    "query": "\n            INSERT INTO auth (public_id, id, password_hash)\n            VALUES ($1, $2, $3)\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Uuid",
-          "Text"
-        ]
-      },
-      "nullable": []
-    }
-  },
   "74aed6fb59eb0ccda1d2ff17a3f1d87e84994971a1e6345c9256506e6078f439": {
     "query": "SELECT * FROM items WHERE sku = ANY ($1) ORDER BY sku ASC",
     "describe": {
@@ -477,6 +515,37 @@
         false,
         false,
         false,
+        false
+      ]
+    }
+  },
+  "9c7699d558829e3af10ce8c935d39ae2fa3a35e2c9249b5aeff4c4c71073dd2d": {
+    "query": "\n            UPDATE shopping_carts\n            SET cart_type = $1\n            WHERE id = $2\n            RETURNING id\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "id",
+          "type_info": "Uuid"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          {
+            "Custom": {
+              "name": "user_cart_type",
+              "kind": {
+                "Enum": [
+                  "ANONYMOUS",
+                  "KNOWN"
+                ]
+              }
+            }
+          },
+          "Uuid"
+        ]
+      },
+      "nullable": [
         false
       ]
     }
@@ -618,8 +687,8 @@
       ]
     }
   },
-  "bcea3bb7c7a9ca03aae6c5940802c07aa9576bfd21653cb2ad467a09eb68e86e": {
-    "query": "\n            INSERT INTO customers ( id, email, first_name, last_name )\n            VALUES ( $1, $2, $3, $4 )\n            ",
+  "d10c6c4782d2ae6cf5c1ce97dc298019973c9b63ad65a51e65cd66f08a1b64a8": {
+    "query": "\n            INSERT INTO customers ( id, email, first_name, last_name, cart_id )\n            VALUES ( $1, $2, $3, $4, $5)\n            ",
     "describe": {
       "columns": [],
       "parameters": {
@@ -627,7 +696,8 @@
           "Uuid",
           "Text",
           "Text",
-          "Text"
+          "Text",
+          "Uuid"
         ]
       },
       "nullable": []
@@ -698,6 +768,79 @@
         false,
         true
       ]
+    }
+  },
+  "e4a21b64d2aff2ba8227743ec48813b71cc3d45b1793f982880ae120cb090b59": {
+    "query": "\n            INSERT INTO auth (public_id, id, password_hash, email)\n            VALUES ($1, $2, $3, $4)\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Uuid",
+          "Text",
+          "Text"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "f2b124167500ea26e9971839c85e54f1d4862686cdad59c614bf73f9e415c20c": {
+    "query": "\n                UPDATE shopping_carts\n                SET cart_type = $1\n                WHERE id = $2\n                ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          {
+            "Custom": {
+              "name": "user_cart_type",
+              "kind": {
+                "Enum": [
+                  "ANONYMOUS",
+                  "KNOWN"
+                ]
+              }
+            }
+          },
+          "Uuid"
+        ]
+      },
+      "nullable": []
+    }
+  },
+  "fbb5f7f000ca669ae6b041445ec2a3a7a5efe68fc17727f22a38dea523d02116": {
+    "query": "\n            INSERT INTO shopping_carts (id, customer_id, cart_type, currency)\n            VALUES ( $1, $2, $3, $4)\n            ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Uuid",
+          {
+            "Custom": {
+              "name": "user_cart_type",
+              "kind": {
+                "Enum": [
+                  "ANONYMOUS",
+                  "KNOWN"
+                ]
+              }
+            }
+          },
+          {
+            "Custom": {
+              "name": "currency_type",
+              "kind": {
+                "Enum": [
+                  "GBP",
+                  "USD"
+                ]
+              }
+            }
+          }
+        ]
+      },
+      "nullable": []
     }
   }
 }

@@ -643,6 +643,7 @@ dependencies = [
  "async-graphql-actix-web",
  "async-trait",
  "chrono",
+ "claim",
  "config",
  "futures",
  "jsonwebtoken",
@@ -654,6 +655,7 @@ dependencies = [
  "serde_json",
  "sqlx",
  "strum",
+ "thiserror",
  "tokio",
  "tracing",
  "tracing-actix-web",
@@ -861,6 +863,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "claim"
+version = "0.4.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "68ad37958d55b29a7088909368968d2fe876a24c203f8441195130f3b15194b9"
+dependencies = [
+ "autocfg",
+]
+
+[[package]]
 name = "cloudabi"
 version = "0.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -921,6 +932,22 @@ dependencies = [
  "percent-encoding",
  "time 0.2.23",
  "version_check",
+]
+
+[[package]]
+name = "cookie_store"
+version = "0.12.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3818dfca4b0cb5211a659bbcbb94225b7127407b2b135e650d717bfb78ab10d3"
+dependencies = [
+ "cookie",
+ "idna",
+ "log",
+ "publicsuffix",
+ "serde",
+ "serde_json",
+ "time 0.2.23",
+ "url",
 ]
 
 [[package]]
@@ -1126,6 +1153,15 @@ dependencies = [
  "proc-macro2",
  "quote",
  "syn",
+]
+
+[[package]]
+name = "error-chain"
+version = "0.12.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "2d2f06b9cac1506ece98fe3231e3cc9c4410ec3d5b1f24ae1c8946f0742cdefc"
+dependencies = [
+ "version_check",
 ]
 
 [[package]]
@@ -2281,6 +2317,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "publicsuffix"
+version = "1.5.4"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3bbaa49075179162b49acac1c6aa45fb4dafb5f13cf6794276d77bc7fd95757b"
+dependencies = [
+ "error-chain",
+ "idna",
+ "lazy_static",
+ "regex",
+ "url",
+]
+
+[[package]]
 name = "quick-error"
 version = "1.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2393,6 +2442,8 @@ checksum = "fb15d6255c792356a0f578d8a645c677904dc02e862bebe2ecc18e0c01b9a0ce"
 dependencies = [
  "base64 0.13.0",
  "bytes",
+ "cookie",
+ "cookie_store",
  "encoding_rs",
  "futures-core",
  "futures-util",
@@ -2412,6 +2463,7 @@ dependencies = [
  "serde",
  "serde_json",
  "serde_urlencoded",
+ "time 0.2.23",
  "tokio",
  "tokio-tls",
  "trust-dns-resolver",

@@ -1,6 +1,10 @@
 version: 2
 jobs:
   build-and-test:
+    # Given the size of the project now, linking fails due to not having enough
+    # memory on small & medium resource classes. Without going up to a paid tier
+    # resource class, the current way to work around this is to compile on a
+    # single thread - suffix `-j 1`. eg. `cargo build -j 1`
     resource_class: medium
     docker:
       - image: circleci/rust
@@ -25,7 +29,7 @@ jobs:
             SKIP_DOCKER=true ./scripts/init_db.sh
       - run:
           name: Build all targets
-          command: cargo build
+          command: cargo build -j 1
       - save_cache:
           paths:
             - /usr/local/cargo/registry
@@ -35,7 +39,7 @@ jobs:
           key: v1-cargo-cache-{{ arch }}-{{ checksum "Cargo.lock" }}
       - run:
           name: Run all tests
-          command: cargo test
+          command: cargo test -j 1
       - run:
           name: Check sqlx metadata file
           command: cargo sqlx prepare --check -- --lib

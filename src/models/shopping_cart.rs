@@ -1,4 +1,3 @@
-use anyhow::Result;
 use async_graphql::{Context, Object};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
@@ -11,6 +10,7 @@ use uuid::Uuid;
 use crate::{
     database::{CartItemDatabase, CartItemRepository, ShoppingCartRepository},
     models::{cart_item::InternalCartItem, CartItem, Currency},
+    Result,
 };
 
 #[derive(Debug, async_graphql::Enum, Copy, Clone, Eq, PartialEq, Deserialize, sqlx::Type)]
@@ -64,6 +64,14 @@ impl ShoppingCart {
     }
 
     #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
+    pub async fn find_cart_id_by_customer_id<DB: ShoppingCartRepository>(
+        customer_id: Uuid,
+        pool: &PgPool,
+    ) -> Result<Uuid> {
+        DB::find_cart_id_by_customer_id(customer_id, pool).await
+    }
+
+    #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
     pub async fn new_anonymous<DB: ShoppingCartRepository>(
         currency: Currency,
         pool: &PgPool,
@@ -91,6 +99,28 @@ impl ShoppingCart {
         cart.update_items_in_cart(items);
         cart.update_cart::<DB, CI>(pool).await
     }
+
+    #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
+    pub async fn merge_shopping_carts<DB: ShoppingCartRepository, CI: CartItemRepository>(
+        customers_cart_id: Uuid,
+        anonymous_cart_id: Uuid,
+        pool: &PgPool,
+    ) -> Result<Uuid> {
+        let mut cart = Self::find_by_id::<DB>(customers_cart_id, pool).await?;
+        let anon_cart = Self::find_by_id::<DB>(anonymous_cart_id, pool).await?;
+        cart.merge_items_from_other_cart(anon_cart);
+        cart.update_cart::<DB, CI>(pool).await?;
+        Ok(customers_cart_id)
+    }
+
+    #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
+    pub async fn update_cart_type<DB: ShoppingCartRepository>(
+        cart_id: Uuid,
+        cart_type: CartType,
+        pool: &PgPool,
+    ) -> Result<Uuid> {
+        DB::update_cart_type(cart_id, cart_type, pool).await
+    }
 }
 
 /// Private API
@@ -106,6 +136,7 @@ impl ShoppingCart {
         DB::create_new_cart(id, customer_id, cart_type, currency, pool).await
     }
 
+    // @TODO - Write unit tests for this
     #[tracing::instrument(fields(model = "ShoppingCart"))]
     fn update_items_in_cart(&mut self, items: Vec<InternalCartItem>) {
         let mut current_cart_items = Vec::new();
@@ -114,6 +145,29 @@ impl ShoppingCart {
         for item in items {
             let updated_item = match item_set.take(&item) {
                 Some(old_item) => old_item + item,
+                None => item,
+            };
+            if updated_item.quantity > 0 {
+                item_set.insert(updated_item);
+            }
+        }
+        self.items = item_set.into_iter().collect::<Vec<InternalCartItem>>();
+    }
+
+    // @TODO - Write unit tests for this
+    #[tracing::instrument(fields(model = "ShoppingCart"))]
+    fn merge_items_from_other_cart(&mut self, other: Self) {
+        let mut current_cart_items = Vec::new();
+        std::mem::swap(&mut self.items, &mut current_cart_items);
+        let mut item_set: HashSet<InternalCartItem> = HashSet::from_iter(current_cart_items);
+        for item in other.items {
+            let updated_item = match item_set.take(&item) {
+                Some(mut old_item) => {
+                    // Current Logic:
+                    // If the same item is in both carts, take the largest quantity
+                    old_item.quantity = old_item.quantity.max(item.quantity);
+                    old_item
+                }
                 None => item,
             };
             if updated_item.quantity > 0 {
@@ -161,14 +215,14 @@ impl From<SqlxShoppingCart> for ShoppingCart {
     }
 }
 
+// This Resolver should never return `customer_id`, as the customer id
+// stored within the table is the **private** one, and should never be
+// publically exposed
+
 #[Object]
 impl ShoppingCart {
     async fn id(&self) -> Uuid {
         self.id
-    }
-
-    async fn customer_id(&self) -> Option<Uuid> {
-        self.customer_id
     }
 
     async fn cart_type(&self) -> CartType {
