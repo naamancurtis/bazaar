@@ -25,7 +25,7 @@ jobs:
             SKIP_DOCKER=true ./scripts/init_db.sh
       - run:
           name: Build all targets
-          command: cargo build
+          command: cargo build -j 1
       - save_cache:
           paths:
             - /usr/local/cargo/registry
