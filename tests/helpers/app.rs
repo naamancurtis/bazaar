@@ -2,7 +2,7 @@ use sqlx::PgPool;
 use std::net::TcpListener;
 use uuid::Uuid;
 
-use crate::helpers::{configure_database, set_env_vars_for_tests, TRACING};
+use crate::helpers::{configure_database, TRACING};
 
 pub struct TestApp {
     pub address: String,
@@ -21,7 +21,6 @@ pub async fn spawn_app() -> TestApp {
     let port = listener.local_addr().unwrap().port();
 
     let mut configuration = bazaar::get_configuration().expect("failed to read configuration");
-    set_env_vars_for_tests();
 
     let database_name = Uuid::new_v4().to_string();
     configuration.set_database_name(database_name);

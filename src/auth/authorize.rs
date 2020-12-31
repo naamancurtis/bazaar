@@ -118,12 +118,11 @@ pub fn decode_token(token: &str, token_type: TokenType) -> Result<TokenData<Clai
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_helpers::{create_valid_jwt_token, set_token_env_vars_for_tests};
+    use crate::test_helpers::create_valid_jwt_token;
     use claim::assert_ok;
 
     #[test]
     fn test_encode_jwt() {
-        set_token_env_vars_for_tests();
         let iat = Utc::now();
         let exp = iat + Duration::minutes(15);
         let claims = Claims {
@@ -146,7 +145,6 @@ mod tests {
 
     #[test]
     fn test_encode_token() {
-        set_token_env_vars_for_tests();
         let user_id = None;
         let cart_id = Uuid::new_v4();
         let token = encode_token(user_id, cart_id, TokenType::Refresh).unwrap();
@@ -165,7 +163,6 @@ mod tests {
 
     #[test]
     fn decode_valid_token() {
-        set_token_env_vars_for_tests();
         let (token, claims) = create_valid_jwt_token(TokenType::Access);
         let decoded_token = decode_token(&token, TokenType::Access);
         assert_ok!(&decoded_token);
