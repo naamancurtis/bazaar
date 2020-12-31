@@ -1,7 +1,7 @@
 version: 2
 jobs:
   build-and-test:
-    resource_class: medium+
+    resource_class: medium
     docker:
       - image: circleci/rust
       - image: circleci/postgres:alpine
