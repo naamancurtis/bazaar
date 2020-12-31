@@ -55,10 +55,8 @@ type MutationRoot {
 	anonymousLogin: BazaarTokens!
 	signUp(email: String!, password: String!, firstName: String!, lastName: String!): BazaarTokens!
 	updateCustomer(update: [CustomerUpdate!]!): Customer!
-	createAnonymousCart(currency: Currency!): ShoppingCart!
-	createKnownCart(id: UUID!, currency: Currency!): ShoppingCart!
 	addItemsToCart(newItems: [UpdateCartItem!]!): ShoppingCart!
-	removeItemsFromCart(id: UUID!, removedItems: [UpdateCartItem!]!): ShoppingCart!
+	removeItemsFromCart(removedItems: [UpdateCartItem!]!): ShoppingCart!
 }
 type BazaarTokens {
 	issuedAt: Int!

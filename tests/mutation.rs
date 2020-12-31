@@ -481,9 +481,6 @@ async fn mutation_remove_item_from_cart_completely_removes_negative_quantities()
 
     let ids = insert_default_customer_with_cart(&app.db_pool).await?;
     let cart = ShoppingCart::edit_cart_items(
-        ids.cart.unwrap(),
-        vec![InternalCartItem {
-            sku: "12345678".to_string(),
             quantity: 1,
         }],
         &app.db_pool,
@@ -524,7 +521,6 @@ async fn mutation_remove_item_from_cart_completely_removes_negative_quantities()
     assert_json_include!(
         actual: &cart,
         expected: json!({
-            "id": ids.cart,
             "currency": "GBP",
             "cartType": "KNOWN",
             "items": [],

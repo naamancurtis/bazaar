@@ -21,7 +21,7 @@ lazy_static! {
     pub static ref SALT: String = {
         let salt: Result<String, ()> = var("SALT").map_err(|e| {
             error!(err = ?e, "failed to retrieve salt");
-            panic!("no salt was provided");
+            panic!("no SALT was provided");
         });
         salt.unwrap()
     };
@@ -32,7 +32,7 @@ lazy_static! {
     pub static ref CONFIG: Config<'static> = Config {
         variant: Variant::Argon2i,
         version: Version::Version13,
-        mem_cost: 65536,
+        mem_cost: 4096,
         time_cost: 10,
         lanes: 4,
         thread_mode: ThreadMode::Parallel,

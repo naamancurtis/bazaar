@@ -1,20 +1,18 @@
 use anyhow::Result;
-use reqwest::{
-    header::{HeaderValue, AUTHORIZATION},
-    Client,
-};
+use reqwest::ClientBuilder;
 use serde_json::Value;
+use std::time::Duration;
+
+static APP_USER_AGENT: &str = concat!(env!("CARGO_PKG_NAME"), "/", env!("CARGO_PKG_VERSION"),);
 
 pub async fn send_request(address: &str, token: Option<&str>, body: Value) -> Result<Value> {
-    let client = Client::new();
-    let access_token = if let Some(token) = token {
-        format!("Bearer {}", token)
-    } else {
-        String::default()
-    };
+    let client = ClientBuilder::new()
+        .user_agent(APP_USER_AGENT)
+        .timeout(Duration::from_secs(10))
+        .build()?;
     let mut request = client.post(address);
-    if !access_token.is_empty() {
-        request = request.header(AUTHORIZATION, HeaderValue::from_str(&access_token)?);
+    if let Some(token) = token {
+        request = request.bearer_auth(token);
     }
     let response = request.json(&body).send().await?;
     let data = response.json::<serde_json::Value>().await?;

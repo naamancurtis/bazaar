@@ -8,6 +8,7 @@ use crate::{
 };
 
 #[derive(Debug, Deserialize)]
+#[serde(rename_all(deserialize = "camelCase"))]
 pub struct RefreshRequest {
     pub login_redirect_url: String,
 }

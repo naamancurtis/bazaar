@@ -2,7 +2,6 @@ use async_graphql::{
     validators::{Email, StringMinLength},
     Context, ErrorExtensions, Object, Result,
 };
-use sqlx::PgPool;
 use tracing::error;
 use uuid::Uuid;
 
@@ -157,37 +156,6 @@ impl MutationRoot {
     }
 
     #[tracing::instrument(skip(self, ctx))]
-    async fn create_anonymous_cart(
-        &self,
-        ctx: &Context<'_>,
-        currency: Currency,
-    ) -> Result<ShoppingCart> {
-        let pool = ctx.data::<PgPool>()?;
-        ShoppingCart::new_anonymous::<ShoppingCartDatabase>(currency, pool)
-            .await
-            .map_err(|err| {
-                error!(?err, "failed to create anonymous cart");
-                err.extend()
-            })
-    }
-
-    #[tracing::instrument(skip(self, ctx))]
-    async fn create_known_cart(
-        &self,
-        ctx: &Context<'_>,
-        id: Uuid,
-        currency: Currency,
-    ) -> Result<ShoppingCart> {
-        let pool = ctx.data::<PgPool>()?;
-        Customer::add_new_cart::<CustomerDatabase, ShoppingCartDatabase>(id, currency, pool)
-            .await
-            .map_err(|err| {
-                error!(?err, "failed to create known cart");
-                err.extend()
-            })
-    }
-
-    #[tracing::instrument(skip(self, ctx))]
     async fn add_items_to_cart(
         &self,
         ctx: &Context<'_>,
@@ -196,8 +164,9 @@ impl MutationRoot {
         let (pool, token) = extract_token_and_database_pool(ctx, TokenType::Access)
             .await
             .map_err(|e| e.extend())?;
+        let token = token.map_err(|e| e.extend())?;
         ShoppingCart::edit_cart_items::<ShoppingCartDatabase, CartItemDatabase>(
-            token?.cart_id,
+            token.cart_id,
             new_items.into_iter().map(Into::into).collect(),
             pool,
         )
@@ -212,14 +181,14 @@ impl MutationRoot {
     async fn remove_items_from_cart(
         &self,
         ctx: &Context<'_>,
-        id: Uuid,
         removed_items: Vec<UpdateCartItem>,
     ) -> Result<ShoppingCart> {
         let (pool, token) = extract_token_and_database_pool(ctx, TokenType::Access)
             .await
             .map_err(|e| e.extend())?;
+        let token = token.map_err(|e| e.extend())?;
         ShoppingCart::edit_cart_items::<ShoppingCartDatabase, CartItemDatabase>(
-            token?.cart_id,
+            token.cart_id,
             removed_items
                 .into_iter()
                 .map(|i| {
