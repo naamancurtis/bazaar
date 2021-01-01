@@ -37,23 +37,24 @@ pub async fn configure_database(config: &DatabaseSettings) -> PgPool {
 /// 2. Customers Table
 /// 3. Shopping Carts Table
 pub async fn insert_default_customer(pool: &PgPool) -> Result<CustomerData> {
-    let mut customer = CustomerData {
-        id: None,
-        cart_id: None,
-        email: Some("imbatman@test.com".to_string()),
-        password: Some("Passw0rd".to_string()),
-    };
+    let email = "imbatman@test.com";
+    let password = "Passw0rd";
     let ids = Customer::new::<CustomerDatabase>(
         Uuid::new_v4(),
-        customer.email.clone().unwrap(),
-        customer.password.clone().unwrap(),
+        email.to_string(),
+        password.to_string(),
         "Bruce".to_string(),
         "Wayne".to_string(),
         None,
         pool,
     )
     .await?;
-    customer.id = Some(ids.public_id);
-    customer.cart_id = Some(ids.cart_id);
+    let customer = CustomerData {
+        public_id: Some(ids.public_id),
+        private_id: Some(ids.get_private_id()),
+        cart_id: Some(ids.cart_id),
+        email: Some(email.to_owned()),
+        password: Some(password.to_owned()),
+    };
     Ok(customer)
 }

@@ -1,4 +1,4 @@
-use async_graphql::{Context, Object};
+use async_graphql::{Context, ErrorExtensions, Object};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use sqlx::{types::Json, PgPool};
@@ -255,16 +255,13 @@ impl ShoppingCart {
 
     // @TODO - Implement proper error handling for this - theres quite a few layers that could
     // potentially go wrong
-    async fn items(&self, ctx: &Context<'_>) -> Vec<CartItem> {
+    async fn items(&self, ctx: &Context<'_>) -> async_graphql::Result<Vec<CartItem>> {
         if self.items.is_empty() {
-            return Vec::new();
+            return Ok(Vec::new());
         }
-        if let Ok(pool) = ctx.data::<PgPool>() {
-            let items = CartItem::find_multiple::<CartItemDatabase>(&self.items, pool)
-                .await
-                .expect("error occurred while trying to find cart items");
-            return items;
-        }
-        Vec::new()
+        let pool = ctx.data::<PgPool>()?;
+        CartItem::find_multiple::<CartItemDatabase>(&self.items, pool)
+            .await
+            .map_err(|e| e.extend())
     }
 }

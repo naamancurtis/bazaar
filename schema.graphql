@@ -13,7 +13,7 @@ type Customer {
 	lastName: String!
 	createdAt: DateTime!
 	lastModified: DateTime!
-	cart: ShoppingCart
+	cart: ShoppingCart!
 }
 scalar UUID
 """
@@ -73,6 +73,10 @@ type BazaarTokens {
 	Time until expiry (in seconds)
 	"""
 	refreshTokenExpiresIn: Int!
+	"""
+	Will always be `Bearer`
+	"""
+	tokenType: String!
 }
 input CustomerUpdate {
 key: String!

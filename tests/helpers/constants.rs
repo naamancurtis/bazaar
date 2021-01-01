@@ -31,4 +31,5 @@ pub const TOKEN_GRAPHQL_FIELDS: &str = "#
  accessTokenExpiresIn
  refreshToken
  refreshTokenExpiresIn
+ tokenType
  #";

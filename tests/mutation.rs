@@ -111,7 +111,7 @@ async fn mutation_sign_up_with_anonymous_token_works() -> Result<()> {
     assert!(access_token.len() > 20);
     assert!(refresh_token.len() > 20);
     let access_token = decode_token(access_token, TokenType::Access)?;
-    let refresh_token = decode_token(refresh_token, TokenType::Refresh)?;
+    let refresh_token = decode_token(refresh_token, TokenType::Refresh(0))?;
     assert_eq!(access_token.claims.cart_id, refresh_token.claims.cart_id);
     assert_eq!(access_token.claims.cart_id, tokens.cart_id);
 
@@ -202,7 +202,7 @@ async fn mutation_login_with_valid_credentials_and_no_tokens_works() -> Result<(
     assert!(access_token.len() > 20);
     assert!(refresh_token.len() > 20);
     let access_token = decode_token(access_token, TokenType::Access)?;
-    let refresh_token = decode_token(refresh_token, TokenType::Refresh)?;
+    let refresh_token = decode_token(refresh_token, TokenType::Refresh(0))?;
     assert_eq!(access_token.claims.cart_id, refresh_token.claims.cart_id);
     assert_eq!(
         access_token.claims.cart_id,
@@ -253,7 +253,7 @@ async fn mutation_login_with_valid_credentials_and_anonymous_tokens_works() -> R
     assert!(access_token.len() > 20);
     assert!(refresh_token.len() > 20);
     let access_token = decode_token(access_token, TokenType::Access)?;
-    let refresh_token = decode_token(refresh_token, TokenType::Refresh)?;
+    let refresh_token = decode_token(refresh_token, TokenType::Refresh(0))?;
     assert_eq!(access_token.claims.cart_id, refresh_token.claims.cart_id);
     assert_eq!(
         access_token.claims.cart_id,
@@ -437,7 +437,7 @@ async fn mutation_anonymous_login_works() -> Result<()> {
     assert!(access_token.len() > 20);
     assert!(refresh_token.len() > 20);
     let access_token = decode_token(access_token, TokenType::Access)?;
-    let refresh_token = decode_token(refresh_token, TokenType::Refresh)?;
+    let refresh_token = decode_token(refresh_token, TokenType::Refresh(0))?;
     assert_eq!(access_token.claims.cart_id, refresh_token.claims.cart_id);
 
     Ok(())
@@ -503,7 +503,7 @@ async fn mutation_update_customer_works() -> Result<()> {
         let body = json!({
             "query": graphql_mutatation,
             "variables": {
-                "id": tokens.customer.id.clone().unwrap(),
+                "id": tokens.customer.public_id.clone().unwrap(),
                 "update": case
             }
         });

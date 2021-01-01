@@ -301,6 +301,11 @@
           "ordinal": 6,
           "name": "cart_id",
           "type_info": "Uuid"
+        },
+        {
+          "ordinal": 7,
+          "name": "refresh_token_count",
+          "type_info": "Int4"
         }
       ],
       "parameters": {
@@ -315,7 +320,28 @@
         false,
         false,
         false,
-        true
+        false,
+        false
+      ]
+    }
+  },
+  "5ff5503af15759df64fd2f82a5cdb72931df8c3b4fe4ff34457d52c89d39204c": {
+    "query": "\n            SELECT refresh_token_count FROM customers WHERE id = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "refresh_token_count",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false
       ]
     }
   },
@@ -451,6 +477,11 @@
           "ordinal": 6,
           "name": "cart_id",
           "type_info": "Uuid"
+        },
+        {
+          "ordinal": 7,
+          "name": "refresh_token_count",
+          "type_info": "Int4"
         }
       ],
       "parameters": {
@@ -465,7 +496,8 @@
         false,
         false,
         false,
-        true
+        false,
+        false
       ]
     }
   },
@@ -683,7 +715,27 @@
         ]
       },
       "nullable": [
-        true
+        false
+      ]
+    }
+  },
+  "c26244ee9b7c7f185a0cea863448e2e79483cb60fb093261af676911e0850101": {
+    "query": "\n            UPDATE customers\n            SET refresh_token_count = refresh_token_count + 1\n            WHERE id = $1\n            RETURNING refresh_token_count\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "refresh_token_count",
+          "type_info": "Int4"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Uuid"
+        ]
+      },
+      "nullable": [
+        false
       ]
     }
   },
@@ -754,6 +806,11 @@
           "ordinal": 6,
           "name": "cart_id",
           "type_info": "Uuid"
+        },
+        {
+          "ordinal": 7,
+          "name": "refresh_token_count",
+          "type_info": "Int4"
         }
       ],
       "parameters": {
@@ -766,7 +823,8 @@
         false,
         false,
         false,
-        true
+        false,
+        false
       ]
     }
   },

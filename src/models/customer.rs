@@ -1,4 +1,4 @@
-use async_graphql::{Context, InputObject, Object};
+use async_graphql::{Context, ErrorExtensions, InputObject, Object};
 use chrono::{DateTime, Utc};
 use serde::Deserialize;
 use sqlx::PgPool;
@@ -20,7 +20,8 @@ pub struct Customer {
     pub last_name: String,
     pub created_at: DateTime<Utc>,
     pub last_modified: DateTime<Utc>,
-    pub cart_id: Option<Uuid>,
+    pub cart_id: Uuid,
+    pub refresh_token_count: i32,
 }
 
 #[derive(InputObject, Debug, Deserialize)]
@@ -31,7 +32,7 @@ pub struct CustomerUpdate {
 
 #[derive(Debug, Clone, Copy)]
 pub struct CustomerIds {
-    id: Uuid,
+    pub(crate) id: Uuid,
     pub public_id: Uuid,
     pub cart_id: Uuid,
 }
@@ -122,18 +123,34 @@ impl Customer {
         currency: Currency,
         pool: &PgPool,
     ) -> Result<ShoppingCart> {
-        if let Some(cart_id) = C::check_cart(id, pool).await {
+        if let Ok(cart_id) = C::check_cart(id, pool).await {
             return ShoppingCart::find_by_id::<SC>(cart_id, pool).await;
         };
         let cart_id = Uuid::new_v4();
         C::add_new_cart(id, cart_id, currency, pool).await
+    }
+
+    #[tracing::instrument(skip(pool), fields(model = "Customer"))]
+    pub async fn increment_refresh_token_counter<DB: CustomerRepository>(
+        id: Uuid,
+        pool: &PgPool,
+    ) -> Result<i32> {
+        DB::increment_refresh_token_counter(id, pool).await
+    }
+
+    #[tracing::instrument(skip(pool), fields(model = "Customer"))]
+    pub async fn fetch_refresh_token_counter<DB: CustomerRepository>(
+        id: Uuid,
+        pool: &PgPool,
+    ) -> Result<i32> {
+        DB::fetch_refresh_token_counter(id, pool).await
     }
 }
 
 /// Private API
 impl Customer {
     #[tracing::instrument(skip(pool), fields(model = "Customer"))]
-    async fn check_cart<DB: CustomerRepository>(id: Uuid, pool: &PgPool) -> Option<Uuid> {
+    async fn check_cart<DB: CustomerRepository>(id: Uuid, pool: &PgPool) -> Result<Uuid> {
         DB::check_cart(id, pool).await
     }
 }
@@ -164,13 +181,21 @@ impl Customer {
         self.last_modified
     }
 
-    async fn cart(&self, ctx: &Context<'_>) -> Option<ShoppingCart> {
-        let pool = ctx.data::<PgPool>().ok()?;
-        if let Some(cart_id) = self.cart_id {
-            return ShoppingCart::find_by_id::<ShoppingCartDatabase>(cart_id, pool)
-                .await
-                .ok();
-        }
-        None
+    async fn cart(&self, ctx: &Context<'_>) -> async_graphql::Result<ShoppingCart> {
+        let pool = ctx.data::<PgPool>()?;
+        ShoppingCart::find_by_id::<ShoppingCartDatabase>(self.cart_id, pool)
+            .await
+            .map_err(|e| e.extend())
+    }
+}
+
+impl CustomerIds {
+    /// This should never be used in the actual application
+    /// This is purely for testing
+    ///
+    /// Unfortunately there doesn't seem to be a way to put it behind
+    /// a `cfg(test)` flag if we want it accessible in integration tests
+    pub fn get_private_id(&self) -> Uuid {
+        self.id
     }
 }

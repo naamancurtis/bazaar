@@ -55,10 +55,12 @@ pub fn encode_token(
     token_type: TokenType,
 ) -> Result<String, BazaarError> {
     let iat = Utc::now();
-    let exp = if token_type == TokenType::Access {
-        iat + Duration::seconds(ACCESS_TOKEN_DURATION)
+    let (exp, count) = if let TokenType::Refresh(count) = token_type {
+        let exp = iat + Duration::seconds(REFRESH_TOKEN_DURATION);
+        (exp, Some(count))
     } else {
-        iat + Duration::seconds(REFRESH_TOKEN_DURATION)
+        let exp = iat + Duration::seconds(ACCESS_TOKEN_DURATION);
+        (exp, None)
     };
     let customer_type = if user_id.is_some() {
         CustomerType::Known
@@ -72,6 +74,7 @@ pub fn encode_token(
         cart_id,
         exp: exp.timestamp() as usize,
         iat: iat.timestamp() as usize,
+        count,
         id: None,
         token_type,
     };
@@ -132,6 +135,7 @@ mod tests {
             cart_id: Uuid::new_v4(),
             exp: exp.timestamp() as usize,
             iat: iat.timestamp() as usize,
+            count: None,
             id: None,
             token_type: TokenType::Access,
         };
@@ -149,7 +153,7 @@ mod tests {
         set_token_env_vars_for_tests();
         let user_id = None;
         let cart_id = Uuid::new_v4();
-        let token = encode_token(user_id, cart_id, TokenType::Refresh).unwrap();
+        let token = encode_token(user_id, cart_id, TokenType::Refresh(1)).unwrap();
         let decoding_key = DecodingKey::from_rsa_pem(REFRESH_TOKEN_PUBLIC_KEY.as_bytes()).unwrap();
         let decoded_token =
             decode::<Claims>(&token, &decoding_key, &Validation::new(Algorithm::PS256)).unwrap();
@@ -158,6 +162,7 @@ mod tests {
         assert_eq!(decoded_token.claims.sub, user_id);
         assert_eq!(decoded_token.claims.cart_id, cart_id);
         assert_eq!(decoded_token.claims.customer_type, CustomerType::Anonymous);
+        assert_eq!(decoded_token.claims.count, Some(1));
         let diff = decoded_token.claims.exp - decoded_token.claims.iat;
         let expected_diff = Duration::weeks(4).num_seconds() as usize;
         assert_eq!(diff, expected_diff);
