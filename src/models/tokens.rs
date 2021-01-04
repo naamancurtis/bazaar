@@ -17,6 +17,6 @@ pub struct BazaarTokens {
     /// Time until expiry (in seconds)
     pub refresh_token_expires_in: i64,
 
-    /// Will always be `Bearer`
+    /// Will always be `bearer`
     pub token_type: String,
 }

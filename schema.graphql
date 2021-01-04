@@ -74,7 +74,7 @@ type BazaarTokens {
 	"""
 	refreshTokenExpiresIn: Int!
 	"""
-	Will always be `Bearer`
+	Will always be `bearer`
 	"""
 	tokenType: String!
 }
