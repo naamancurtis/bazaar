@@ -33,6 +33,9 @@ pub enum BazaarError {
     #[error("Internal Server Error")]
     ServerError(String),
 
+    #[error("Internal Server Error")]
+    PoisonConcurrencyError(String),
+
     #[error("Unexpected error occurred")]
     UnexpectedError,
 
@@ -73,7 +76,7 @@ impl ErrorExtensions for BazaarError {
                 e.set("statusText", "SERVER_ERROR");
                 e.set("context", error.to_string());
             }
-            Self::UnexpectedError => {
+            Self::UnexpectedError | Self::PoisonConcurrencyError(_) => {
                 e.set("status", 500);
                 e.set("statusText", "SERVER_ERROR");
             }

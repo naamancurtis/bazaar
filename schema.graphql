@@ -60,22 +60,8 @@ type MutationRoot {
 }
 type BazaarTokens {
 	issuedAt: Int!
-	accessToken: String!
-	"""
-	Time until expiry (in seconds)
-	"""
 	accessTokenExpiresIn: Int!
-	"""
-	This token is automatically set in the cookies
-	"""
-	refreshToken: String!
-	"""
-	Time until expiry (in seconds)
-	"""
 	refreshTokenExpiresIn: Int!
-	"""
-	Will always be `bearer`
-	"""
 	tokenType: String!
 }
 input CustomerUpdate {

@@ -8,7 +8,8 @@ use helpers::*;
 #[actix_rt::test]
 async fn query_customer_fails_for_anonymous_user() -> Result<()> {
     let app = spawn_app().await;
-    let tokens = get_anonymous_token(&app.db_pool).await?;
+    let client = build_http_client()?;
+    let tokens = get_anonymous_token(&client, &app.address).await?;
 
     let graphql_mutatation = format!(
         r#"
@@ -25,7 +26,7 @@ async fn query_customer_fails_for_anonymous_user() -> Result<()> {
         "query": graphql_mutatation,
     });
 
-    let data = send_request(&app.address, Some(&tokens.tokens.access_token), body).await?;
+    let data = send_request(&client, &app.address, &body).await?;
 
     let errors = data["errors"].clone();
     assert_json_include!(

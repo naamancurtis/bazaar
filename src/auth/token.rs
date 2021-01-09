@@ -6,7 +6,8 @@ use uuid::Uuid;
 
 use crate::{
     auth::{
-        encode_token, ACCESS_TOKEN_DURATION, REFRESH_TOKEN_DURATION, TIME_TO_REFRESH, TOKEN_TYPE,
+        encode_token, ACCESS_TOKEN_DURATION_SECONDS, REFRESH_TOKEN_DURATION_SECONDS,
+        TIME_TO_REFRESH, TOKEN_TYPE,
     },
     database::{AuthRepository, CustomerRepository},
     models::{
@@ -22,7 +23,7 @@ use crate::{
 ///
 /// This function will automatically invalidate any previous `Refresh Tokens`
 /// issued to that customer
-#[tracing::instrument(skip(public_id))]
+#[tracing::instrument(skip(public_id, pool))]
 pub async fn generate_new_tokens<C: CustomerRepository>(
     public_id: Option<Uuid>,
     private_id: Option<Uuid>,
@@ -41,9 +42,9 @@ pub async fn generate_new_tokens<C: CustomerRepository>(
     let tokens = BazaarTokens {
         issued_at: Utc::now().timestamp(),
         access_token,
-        access_token_expires_in: ACCESS_TOKEN_DURATION,
+        access_token_expires_in: ACCESS_TOKEN_DURATION_SECONDS,
         refresh_token,
-        refresh_token_expires_in: REFRESH_TOKEN_DURATION,
+        refresh_token_expires_in: REFRESH_TOKEN_DURATION_SECONDS,
         token_type: TOKEN_TYPE.to_string(),
     };
 
@@ -92,7 +93,7 @@ pub async fn refresh_tokens<A: AuthRepository, C: CustomerRepository>(
         let tokens = BazaarTokens {
             issued_at: Utc::now().timestamp(),
             access_token: encode_token(public_id, cart_id, TokenType::Access)?,
-            access_token_expires_in: ACCESS_TOKEN_DURATION,
+            access_token_expires_in: ACCESS_TOKEN_DURATION_SECONDS,
             refresh_token: refresh_token_string,
             refresh_token_expires_in: time_till_expiry.num_seconds(),
             token_type: TOKEN_TYPE.to_string(),

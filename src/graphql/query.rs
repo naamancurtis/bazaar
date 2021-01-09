@@ -5,7 +5,7 @@ use tracing::error;
 use crate::{
     database::{CustomerDatabase, ShoppingCartDatabase},
     graphql::extract_token_and_database_pool,
-    models::{Customer, CustomerType, ShoppingCart, TokenType},
+    models::{Customer, CustomerType, ShoppingCart},
     BazaarError,
 };
 
@@ -27,10 +27,11 @@ impl QueryRoot {
 
     #[tracing::instrument(skip(self, ctx))]
     async fn customer<'ctx>(&self, ctx: &'ctx Context<'_>) -> Result<Customer> {
-        let (pool, token) = extract_token_and_database_pool(ctx, TokenType::Access)
+        let mut context = extract_token_and_database_pool(ctx, true, false)
             .await
             .map_err(|e| e.extend())?;
-        let token = token?;
+        let token = context.access_token().map_err(|e| e.extend())?;
+        let pool = context.pool;
 
         if let Some(id) = token.id {
             let mut customer = Customer::find_by_id::<CustomerDatabase>(id, pool)
@@ -50,11 +51,13 @@ impl QueryRoot {
 
     #[tracing::instrument(skip(self, ctx))]
     async fn cart(&self, ctx: &Context<'_>) -> Result<ShoppingCart> {
-        let (pool, token) = extract_token_and_database_pool(ctx, TokenType::Access)
+        let mut context = extract_token_and_database_pool(ctx, true, false)
             .await
             .map_err(|e| e.extend())?;
+        let token = context.access_token().map_err(|e| e.extend())?;
+        let pool = context.pool;
 
-        ShoppingCart::find_by_id::<ShoppingCartDatabase>(token?.cart_id, pool)
+        ShoppingCart::find_by_id::<ShoppingCartDatabase>(token.cart_id, pool)
             .await
             .map_err(|err| {
                 error!(?err, "failed to find customer's cart");

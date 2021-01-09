@@ -1,14 +1,11 @@
 use chrono::{DateTime, Duration, NaiveDateTime, Utc};
 use jsonwebtoken::TokenData;
 use serde::{Deserialize, Serialize};
-use sqlx::PgPool;
-use std::convert::TryFrom;
 use std::marker::PhantomData;
-use std::ops::Deref;
 use tracing::warn;
 use uuid::Uuid;
 
-use crate::{auth::decode_token, database::AuthRepository, models::CustomerType, BazaarError};
+use crate::models::CustomerType;
 
 /// This token is intentionally immutable and unconstructable unless you have
 /// the raw `TokenData`. This is because the public ID should not really be
@@ -95,6 +92,15 @@ pub enum TokenType {
     Refresh(i32),
 }
 
+impl TokenType {
+    pub fn as_str(&self) -> &str {
+        match self {
+            Self::Access => "ACCESS",
+            Self::Refresh(_) => "REFRESH",
+        }
+    }
+}
+
 #[derive(Debug, Serialize, Deserialize, PartialEq, Clone)]
 pub struct Claims {
     pub sub: Option<Uuid>,
@@ -107,150 +113,4 @@ pub struct Claims {
     pub count: Option<i32>,
     #[serde(skip)]
     pub id: Option<Uuid>,
-}
-
-/// At the point in time where we have a `BearerToken` we aren't guarenteed that
-/// the token is valid. _(for that to happen we need to use the
-/// `parse_and_deserialize_token` function). However we are guarenteed that we
-/// were sent a token by the user, and it followed the specified format ie:
-/// `Bearer {token}`
-///
-/// The String contained within the unit struct is just the token, the `Bearer `
-/// prefix has been stripped from it (see `TryFrom` impl for details)
-#[derive(Debug, Clone)]
-pub struct BearerToken(String);
-
-impl Deref for BearerToken {
-    type Target = String;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
-    }
-}
-
-impl TryFrom<String> for BearerToken {
-    type Error = BazaarError;
-
-    fn try_from(s: String) -> Result<Self, Self::Error> {
-        let mut iter = s.split_whitespace();
-        if let Some(prefix) = iter.next() {
-            if prefix != "Bearer" {
-                return Err(BazaarError::InvalidToken(
-                    "Invalid token format, expected `Bearer {token}`".to_string(),
-                ));
-            }
-        }
-        if let Some(token) = iter.next() {
-            return Ok(Self(token.to_owned()));
-        }
-        Err(BazaarError::InvalidToken("No token was found".to_string()))
-    }
-}
-
-#[tracing::instrument(skip(token))]
-pub async fn parse_and_deserialize_token<R: AuthRepository>(
-    token: BearerToken,
-    token_type: TokenType,
-    pool: &PgPool,
-) -> Result<BazaarToken, BazaarError> {
-    let mut token_data = decode_token(&token, token_type)?;
-    let id = R::map_id(token_data.claims.sub, pool).await?;
-    token_data.claims.id = id;
-    Ok(BazaarToken::from(token_data))
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use async_trait::async_trait;
-    use claim::{assert_err, assert_some};
-
-    use crate::{
-        models::auth::AuthCustomer,
-        test_helpers::{create_valid_jwt_token, set_token_env_vars_for_tests},
-        Result,
-    };
-
-    struct MockAuthRepo;
-
-    #[async_trait]
-    impl AuthRepository for MockAuthRepo {
-        async fn map_id(_: Option<Uuid>, _: &PgPool) -> Result<Option<Uuid>> {
-            Ok(Some(Uuid::new_v4()))
-        }
-
-        async fn get_auth_customer(_: &str, _: &PgPool) -> Result<AuthCustomer> {
-            unimplemented!("Not used for these tests");
-        }
-    }
-
-    #[tokio::test]
-    async fn correctly_parses_valid_token() {
-        set_token_env_vars_for_tests();
-        let (token, claims) = create_valid_jwt_token(TokenType::Access);
-        let jwt = format!("Bearer {}", token);
-        let jwt = BearerToken::try_from(jwt).expect("should provide a valid token");
-        let config = crate::get_configuration().expect("failed to read config");
-        let pool = PgPool::connect_lazy(&config.database.raw_pg_url())
-            .expect("failed to create fake connection");
-        let result = parse_and_deserialize_token::<MockAuthRepo>(jwt, TokenType::Access, &pool)
-            .await
-            .expect("should successfully parse a valid token");
-        assert_some!(result.id);
-        assert_eq!(claims.iat, result.iat);
-        assert_eq!(claims.exp, result.exp);
-    }
-
-    #[test]
-    fn rejects_a_malformed_bearer_token() {
-        set_token_env_vars_for_tests();
-        let (token, _) = create_valid_jwt_token(TokenType::Access);
-        let jwt = format!("Berer {}", token);
-        let result = BearerToken::try_from(jwt);
-        assert_err!(&result);
-        let err = result.unwrap_err();
-
-        assert_eq!(
-            err,
-            BazaarError::InvalidToken(
-                "Invalid token format, expected `Bearer {token}`".to_string()
-            )
-        );
-    }
-
-    #[test]
-    fn rejects_when_no_token_is_provided() {
-        set_token_env_vars_for_tests();
-        let jwt = format!("Bearer {}", "".to_string());
-        let result = BearerToken::try_from(jwt);
-        assert_err!(&result);
-        let err = result.unwrap_err();
-
-        assert_eq!(
-            err,
-            BazaarError::InvalidToken("No token was found".to_string())
-        );
-    }
-
-    #[tokio::test]
-    async fn rejects_an_invalid_token_token() {
-        set_token_env_vars_for_tests();
-        let jwt = format!(
-            "Bearer {}",
-            "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c".to_string()
-        );
-        let token = BearerToken::try_from(jwt).expect("should give valid token");
-        let config = crate::get_configuration().expect("failed to read config");
-        let pool = PgPool::connect_lazy(&config.database.raw_pg_url())
-            .expect("failed to create fake connection");
-        let result =
-            parse_and_deserialize_token::<MockAuthRepo>(token, TokenType::Access, &pool).await;
-        assert_err!(&result);
-        let err = result.unwrap_err();
-
-        assert_eq!(
-            err,
-            BazaarError::InvalidToken("Token did not match what was expected".to_string())
-        );
-    }
 }

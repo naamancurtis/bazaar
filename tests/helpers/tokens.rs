@@ -22,26 +22,26 @@ pub struct KnownTokenData {
     pub tokens: BazaarTokens,
 }
 
-pub async fn get_anonymous_token(pool: &PgPool) -> Result<AnonymousTokenData> {
-    let cart = ShoppingCart::new_anonymous::<ShoppingCartDatabase>(Currency::GBP, pool).await?;
-    let tokens = generate_new_tokens::<CustomerDatabase>(None, None, cart.id, pool).await?;
-    Ok(AnonymousTokenData {
-        cart_id: cart.id,
-        tokens,
-    })
-}
+// pub async fn get_anonymous_token(pool: &PgPool) -> Result<AnonymousTokenData> {
+//     let cart = ShoppingCart::new_anonymous::<ShoppingCartDatabase>(Currency::GBP, pool).await?;
+//     let tokens = generate_new_tokens::<CustomerDatabase>(None, None, cart.id, pool).await?;
+//     Ok(AnonymousTokenData {
+//         cart_id: cart.id,
+//         tokens,
+//     })
+// }
 
-/// Inserts a new customer into all the relevant tables and generates
-/// valid tokens for them
-pub async fn get_known_token(pool: &PgPool) -> Result<KnownTokenData> {
-    let customer = insert_default_customer(pool).await?;
-    let tokens = generate_new_tokens::<CustomerDatabase>(
-        customer.public_id,
-        customer.private_id,
-        customer.cart_id.unwrap(),
-        pool,
-    )
-    .await?;
+// /// Inserts a new customer into all the relevant tables and generates
+// /// valid tokens for them
+// pub async fn get_known_token(pool: &PgPool) -> Result<KnownTokenData> {
+//     let customer = insert_default_customer(pool).await?;
+//     let tokens = generate_new_tokens::<CustomerDatabase>(
+//         customer.public_id,
+//         customer.private_id,
+//         customer.cart_id.unwrap(),
+//         pool,
+//     )
+//     .await?;
 
-    Ok(KnownTokenData { customer, tokens })
-}
+//     Ok(KnownTokenData { customer, tokens })
+// }

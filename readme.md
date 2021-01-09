@@ -6,11 +6,12 @@
 
 Bazaar is a fully async GraphQL Server written in Rust using `Actix Web`,
 `Async-GraphQL` and `SQLx`. It implements the basic functionality you would
-expect to find on an **e-commerce platform** [(see below for more details)](#functionality). It's my
-hope that this project will be a useful example for others to see how to compose a production ready Rust
+expect to find on an **e-commerce platform** [(see below for more details)](#functionality).
+
+It's my hope that this project will be a useful example for others to see how to compose a production ready Rust
 application from some of the awesome crates in the ecosystem, along with how various
 things you would typically see in enterprise applications _eg. Testing,
-Observability etc._ can be implemented.
+Observability, CI etc._ can be implemented.
 
 Although this project is intended to be fully functional, certain parts of it
 will be mocked/stubbed/out-of-scope to keep the bounds on what this side project does reasonable.
@@ -22,7 +23,7 @@ raise an issue on the repo.
 #### Out of Scope - _at least for now_
 
 - Stock & Stock Management - Will be included via some stub functionality
-- Checkout - This might be included in the future
+- Checkout & Payments - This might be included in the future
 
 ## Functionality
 
@@ -59,26 +60,28 @@ Authentication in the application has been implemented with Access & Refresh **J
 Where **Access tokens** are short lived and irrevocable and **Refresh tokens** are longer lived and
 revocable.
 
-## Docker
+## Running the App
+
+### Docker
 
 ```sh
 docker build --tag bazaar --file Dockerfile .
 docker run -p 8000:8000 bazaar
 ```
 
-## CI
+### CI
 
 The CI pipeline includes checks on `sqlx-data.json`, if
 it detects that there have been changes without updating this file it will fail CI. See [preparing for SQLx offline below](#preparing_for_sqlx_offline) for more details.
 
-## GraphQL Schema
+### GraphQL Schema
 
 _Although it's not pretty_ there's a small binary in the workspace which can be
 used to generate the graphql schema for the application and write it to
 `schema.graphql`. To do so just run `cargo run --bin schema`. The easiest way to
 keep it up to date is to create a basic `pre-commit` hook to run it for you.
 
-## Tooling
+### Tooling
 
 | Name                                                                 | Purpose                                                                   | Installation                                    |
 | -------------------------------------------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------- |
@@ -86,7 +89,7 @@ keep it up to date is to create a basic `pre-commit` hook to run it for you.
 | [PSQL](https://formulae.brew.sh/formula/libpq)                       | Used predominately for the utilities of `psql`                            | `brew install libpq && brew link --force libpq` |
 | [direnv](https://github.com/direnv/direnv)                           | This is just a nice way of managing environment variables within projects | `brew install direnv`                           |
 
-## Environment Variables
+### Environment Variables
 
 Most environment variables are managed through configuration files found within
 the `configuration` directory, however some that are not included in there (and
@@ -101,7 +104,7 @@ need to be set up manually in order to run the application) can be found below
 | Private key for Access Token  | `ACCESS_TOKEN_PRIVATE_KEY`  | Holds the private key for signing the access token JWTs   | Typical RSA Private Key (`.pem` format) |
 | Public key for Access Token   | `ACCESS_TOKEN_PUBLIC_KEY`   | Holds the public key for verifying the access token JWTs  | Typical RSA Public Key (`.pem` format)  |
 
-## Generating RSA Keys
+### Generating RSA Keys
 
 Using OpenSSL to generate key pairs: _replace what's in the `<>`_
 
@@ -117,16 +120,16 @@ Extracting Public key
 openssl rsa -in <name>.pem -pubout > <name>.pub
 ```
 
-## Database Migrations
+### Database Migrations
 
-### Creating Migrations
+#### Creating Migrations
 
 ```sh
 # Ensure $DATABASE_URL is correctly set
 sqlx migrate add <migration name>
 ```
 
-### Running Migrations
+#### Running Migrations
 
 These are set up to run manually with `./scripts/init_db.sh`, optionally you can
 pass a skip variable if a docker instance is already running `SKIP_DOCKER=true ./scripts/init_db.sh`
@@ -137,7 +140,7 @@ If you need to run them manually, you can do so with the sqlx CLI:
 sqlx migrate run
 ```
 
-### Preparing for SQLX offline
+#### Preparing for SQLX offline
 
 CI will fail if the offline SQLX schema hasn't been updated when it should have
 been. Again it's probably useful to add this as a `pre-commit` hook on the
