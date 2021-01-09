@@ -8,4 +8,6 @@ pub struct CustomerData {
     pub cart_id: Option<Uuid>,
     pub email: Option<String>,
     pub password: Option<String>,
+    pub first_name: Option<String>,
+    pub last_name: Option<String>,
 }

@@ -648,6 +648,7 @@ dependencies = [
  "futures",
  "jsonwebtoken",
  "lazy_static",
+ "regex",
  "reqwest",
  "rust-argon2",
  "serde",

@@ -3,6 +3,7 @@ use actix_web::{
 };
 use async_graphql::http::{playground_source, GraphQLPlaygroundConfig};
 use async_graphql_actix_web::{Request, Response};
+use std::env::var;
 use std::sync::Arc;
 
 use crate::{
@@ -42,10 +43,6 @@ pub async fn graphql_index(
 
     let mut request = graphql_request.into_inner();
     request = request.data(Arc::clone(&cookies));
-
-    // if let Some(token) = token {
-    //     request = request.data(token);
-    // }
 
     let res: Response = schema.execute(request).await.into();
     let mut response = HttpResponse::build(StatusCode::OK);
@@ -88,10 +85,24 @@ fn set_cookie_on_response(
         } else {
             REFRESH_TOKEN_DURATION_SECONDS
         };
+
+        // This is hacky, and ideally we'd be able to get rid of it, but with `Secure` set on the
+        // cookies, and no TLS cert on the server, none of the cookies get set within the tests.
+        // Ideally we'd push all the traffic to https even on tests
+        let secure = if let Ok(env) = var("APP_ENVIRONMENT") {
+            if env == "local" {
+                ""
+            } else {
+                "Secure;"
+            }
+        } else {
+            "Secure;"
+        };
         let cookie_string = format!(
-            "{}={}; SameSite=Strict; Secure; HttpOnly; MaxAge={}",
+            "{}={}; {} HttpOnly; MaxAge={}",
             token_type.as_str(),
             cookie,
+            secure,
             duration
         );
         response.header("Set-Cookie", cookie_string);

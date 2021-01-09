@@ -46,7 +46,7 @@ impl BazaarCookies {
 
     pub(crate) fn get_refresh_cookie(&self) -> Result<Option<String>> {
         Ok(self
-            .access
+            .refresh
             .lock()
             .map_err(|e| BazaarError::PoisonConcurrencyError(e.to_string()))?
             .clone())
@@ -63,6 +63,40 @@ impl BazaarCookies {
     pub(crate) fn set_cookies_to_not_be_changed(&self) -> Result<()> {
         self.set_refresh_cookie(None)?;
         self.set_access_cookie(None)?;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use anyhow::Result;
+    use claim::assert_none;
+
+    #[test]
+    fn get_and_set_refresh_works() -> Result<()> {
+        let cookies = BazaarCookies::default();
+        assert_none!(cookies.get_refresh_cookie()?);
+        cookies.set_refresh_cookie(Some("TOKEN".to_string()))?;
+        assert_eq!(cookies.get_refresh_cookie()?, Some("TOKEN".to_string()));
+        assert_none!(cookies.get_access_cookie()?);
+
+        cookies.set_access_cookie(Some("DOESNT CHANGE".to_string()))?;
+        assert_eq!(cookies.get_refresh_cookie()?, Some("TOKEN".to_string()));
+        Ok(())
+    }
+
+    #[test]
+    fn get_and_set_access_works() -> Result<()> {
+        let cookies = BazaarCookies::default();
+        assert_none!(cookies.get_access_cookie()?);
+        cookies.set_access_cookie(Some("TOKEN".to_string()))?;
+        assert_eq!(cookies.get_access_cookie()?, Some("TOKEN".to_string()));
+        assert_none!(cookies.get_refresh_cookie()?);
+
+        cookies.set_refresh_cookie(Some("DOESNT CHANGE".to_string()))?;
+        assert_eq!(cookies.get_access_cookie()?, Some("TOKEN".to_string()));
+
         Ok(())
     }
 }

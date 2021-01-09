@@ -1,13 +1,13 @@
 use anyhow::Result;
 use assert_json_diff::assert_json_include;
 use chrono::DateTime;
+use claim::assert_some;
 use serde_json::json;
 use uuid::Uuid;
 
 use bazaar::{
-    auth::decode_token,
-    database::{CartItemDatabase, ShoppingCartDatabase},
-    models::{cart_item::InternalCartItem, ShoppingCart, TokenType},
+    database::{CartItemDatabase, CustomerDatabase, ShoppingCartDatabase},
+    models::{cart_item::InternalCartItem, Customer, ShoppingCart},
 };
 
 mod helpers;
@@ -16,6 +16,7 @@ use helpers::*;
 #[actix_rt::test]
 async fn mutation_sign_up_without_token_works() -> Result<()> {
     let app = spawn_app().await;
+    let client = build_http_client()?;
 
     let graphql_mutatation = format!(
         r#"
@@ -42,26 +43,25 @@ async fn mutation_sign_up_without_token_works() -> Result<()> {
         }
     });
 
-    let response = send_request(&app.address, None, body).await?;
-    let tokens = response["data"]["signUp"].clone();
+    let response = send_request(&client, &app.address, &body).await?;
+    let tokens = response.data["data"]["signUp"].clone();
 
     let issued_at = &tokens["issuedAt"];
-    let access_token = &tokens["accessToken"];
-    let refresh_token = &tokens["refreshToken"];
     assert!(issued_at.as_u64().expect("should have valid number") > 1_000_000);
-    assert!(
-        access_token
-            .as_str()
-            .expect("should have valid access token")
-            .len()
-            > 20
-    );
-    assert!(
-        refresh_token
-            .as_str()
-            .expect("should have valid refresh token")
-            .len()
-            > 20
+
+    let new_customer =
+        Customer::find_by_email::<CustomerDatabase>(email.to_string(), &app.db_pool).await?;
+    assert_eq!(&new_customer.first_name, first_name);
+    assert_eq!(&new_customer.last_name, last_name);
+    // The private ID should not be exposed publically
+    assert_ne!(
+        response
+            .cookies
+            .access
+            .expect("after signing up there should be a valid token")
+            .claims
+            .sub,
+        Some(new_customer.id)
     );
 
     Ok(())
@@ -70,7 +70,8 @@ async fn mutation_sign_up_without_token_works() -> Result<()> {
 #[actix_rt::test]
 async fn mutation_sign_up_with_anonymous_token_works() -> Result<()> {
     let app = spawn_app().await;
-    let tokens = get_anonymous_token(&app.db_pool).await?;
+    let client = build_http_client()?;
+    let customer = get_anonymous_token(&client, &app.address).await?;
 
     let graphql_mutatation = format!(
         r#"
@@ -97,23 +98,26 @@ async fn mutation_sign_up_with_anonymous_token_works() -> Result<()> {
         }
     });
 
-    let response = send_request(&app.address, Some(&tokens.tokens.access_token), body).await?;
-    let returned_tokens = response["data"]["signUp"].clone();
+    let response = send_request(&client, &app.address, &body).await?;
+    let returned_tokens = response.data["data"]["signUp"].clone();
 
     let issued_at = &returned_tokens["issuedAt"];
-    let access_token = &returned_tokens["accessToken"]
-        .as_str()
-        .expect("should have valid access token");
-    let refresh_token = &returned_tokens["refreshToken"]
-        .as_str()
-        .expect("should have valid refresh_token");
     assert!(issued_at.as_u64().expect("should have valid number") > 1_000_000);
-    assert!(access_token.len() > 20);
-    assert!(refresh_token.len() > 20);
-    let access_token = decode_token(access_token, TokenType::Access)?;
-    let refresh_token = decode_token(refresh_token, TokenType::Refresh(0))?;
-    assert_eq!(access_token.claims.cart_id, refresh_token.claims.cart_id);
-    assert_eq!(access_token.claims.cart_id, tokens.cart_id);
+
+    let new_customer =
+        Customer::find_by_email::<CustomerDatabase>(email.to_string(), &app.db_pool).await?;
+
+    let access_claims = response
+        .cookies
+        .access
+        .expect("after signing up there should be a valid token")
+        .claims;
+    assert_eq!(&new_customer.first_name, first_name);
+    assert_eq!(&new_customer.last_name, last_name);
+    // The private ID should not be exposed publically
+    assert_ne!(access_claims.sub, Some(new_customer.id));
+    // The cart should have been promoted, so they both should be the same
+    assert_eq!(access_claims.cart_id, customer.cart_id.unwrap());
 
     Ok(())
 }
@@ -121,7 +125,8 @@ async fn mutation_sign_up_with_anonymous_token_works() -> Result<()> {
 #[actix_rt::test]
 async fn mutation_sign_up_with_known_tokens_should_error() -> Result<()> {
     let app = spawn_app().await;
-    let tokens = get_known_token(&app.db_pool).await?;
+    let client = build_http_client()?;
+    let _customer = sign_user_up_and_get_known_token(&client, &app.address).await?;
 
     let graphql_mutatation = format!(
         r#"
@@ -148,8 +153,8 @@ async fn mutation_sign_up_with_known_tokens_should_error() -> Result<()> {
         }
     });
 
-    let response = send_request(&app.address, Some(&tokens.tokens.access_token), body).await?;
-    let errors = response["errors"].clone();
+    let response = send_request(&client, &app.address, &body).await?;
+    let errors = response.data["errors"].clone();
     assert_json_include!(
         actual: errors,
         expected: json!([{
@@ -167,6 +172,7 @@ async fn mutation_sign_up_with_known_tokens_should_error() -> Result<()> {
 #[actix_rt::test]
 async fn mutation_login_with_valid_credentials_and_no_tokens_works() -> Result<()> {
     let app = spawn_app().await;
+    let client = build_http_client()?;
     let customer_details = insert_default_customer(&app.db_pool).await?;
 
     let graphql_mutatation = format!(
@@ -188,26 +194,13 @@ async fn mutation_login_with_valid_credentials_and_no_tokens_works() -> Result<(
         }
     });
 
-    let response = send_request(&app.address, None, body).await?;
-    let returned_tokens = response["data"]["login"].clone();
+    let response = send_request(&client, &app.address, &body).await?;
+    let returned_tokens = response.data["data"]["login"].clone();
 
     let issued_at = &returned_tokens["issuedAt"];
-    let access_token = &returned_tokens["accessToken"]
-        .as_str()
-        .expect("should have valid access token");
-    let refresh_token = &returned_tokens["refreshToken"]
-        .as_str()
-        .expect("should have valid refresh_token");
     assert!(issued_at.as_u64().expect("should have valid number") > 1_000_000);
-    assert!(access_token.len() > 20);
-    assert!(refresh_token.len() > 20);
-    let access_token = decode_token(access_token, TokenType::Access)?;
-    let refresh_token = decode_token(refresh_token, TokenType::Refresh(0))?;
-    assert_eq!(access_token.claims.cart_id, refresh_token.claims.cart_id);
-    assert_eq!(
-        access_token.claims.cart_id,
-        customer_details.cart_id.unwrap()
-    );
+    assert_some!(response.cookies.access);
+    assert_some!(response.cookies.refresh);
 
     Ok(())
 }
@@ -216,9 +209,9 @@ async fn mutation_login_with_valid_credentials_and_no_tokens_works() -> Result<(
 #[actix_rt::test]
 async fn mutation_login_with_valid_credentials_and_anonymous_tokens_works() -> Result<()> {
     let app = spawn_app().await;
+    let client = build_http_client()?;
+    let _anon_customer = get_anonymous_token(&client, &app.address).await?;
     let customer_details = insert_default_customer(&app.db_pool).await?;
-    let tokens = get_anonymous_token(&app.db_pool).await?;
-    assert_ne!(tokens.cart_id, customer_details.cart_id.clone().unwrap());
 
     let graphql_mutatation = format!(
         r#"
@@ -239,26 +232,13 @@ async fn mutation_login_with_valid_credentials_and_anonymous_tokens_works() -> R
         }
     });
 
-    let response = send_request(&app.address, Some(&tokens.tokens.access_token), body).await?;
-    let returned_tokens = response["data"]["login"].clone();
+    let response = send_request(&client, &app.address, &body).await?;
+    let returned_tokens = response.data["data"]["login"].clone();
 
     let issued_at = &returned_tokens["issuedAt"];
-    let access_token = &returned_tokens["accessToken"]
-        .as_str()
-        .expect("should have valid access token");
-    let refresh_token = &returned_tokens["refreshToken"]
-        .as_str()
-        .expect("should have valid refresh_token");
     assert!(issued_at.as_u64().expect("should have valid number") > 1_000_000);
-    assert!(access_token.len() > 20);
-    assert!(refresh_token.len() > 20);
-    let access_token = decode_token(access_token, TokenType::Access)?;
-    let refresh_token = decode_token(refresh_token, TokenType::Refresh(0))?;
-    assert_eq!(access_token.claims.cart_id, refresh_token.claims.cart_id);
-    assert_eq!(
-        access_token.claims.cart_id,
-        customer_details.cart_id.unwrap()
-    );
+    assert_some!(response.cookies.access);
+    assert_some!(response.cookies.refresh);
 
     Ok(())
 }
@@ -266,7 +246,8 @@ async fn mutation_login_with_valid_credentials_and_anonymous_tokens_works() -> R
 #[actix_rt::test]
 async fn mutation_login_with_already_logged_in_customer_errors() -> Result<()> {
     let app = spawn_app().await;
-    let customer_details = get_known_token(&app.db_pool).await?;
+    let client = build_http_client()?;
+    let _customer = sign_user_up_and_get_known_token(&client, &app.address).await?;
 
     let graphql_mutatation = format!(
         r#"
@@ -287,13 +268,8 @@ async fn mutation_login_with_already_logged_in_customer_errors() -> Result<()> {
         }
     });
 
-    let response = send_request(
-        &app.address,
-        Some(&customer_details.tokens.access_token),
-        body,
-    )
-    .await?;
-    let errors = response["errors"].clone();
+    let response = send_request(&client, &app.address, &body).await?;
+    let errors = response.data["errors"].clone();
 
     assert_json_include!(
         actual: errors,
@@ -309,11 +285,9 @@ async fn mutation_login_with_already_logged_in_customer_errors() -> Result<()> {
 }
 
 #[actix_rt::test]
-async fn mutation_login_with_unknown_customer_errors() -> Result<()> {
+async fn mutation_login_with_non_existent_customer_errors() -> Result<()> {
     let app = spawn_app().await;
-    let customer_details = insert_default_customer(&app.db_pool).await?;
-    let tokens = get_anonymous_token(&app.db_pool).await?;
-    assert_ne!(tokens.cart_id, customer_details.cart_id.clone().unwrap());
+    let _customer_details = insert_default_customer(&app.db_pool).await?;
 
     let graphql_mutatation = format!(
         r#"
@@ -334,12 +308,16 @@ async fn mutation_login_with_unknown_customer_errors() -> Result<()> {
         }
     });
 
+    let client = build_http_client()?;
+    get_anonymous_token(&client, &app.address).await?;
+
     // [ No tokens | Anonymous Tokens ]
-    let test_cases = vec![None, Some(tokens.tokens.access_token.as_str())];
+    // One client holds no tokens in cookies, the other holds anonymous tokens
+    let test_cases = vec![build_http_client()?, client];
 
     for case in test_cases.into_iter() {
-        let response = send_request(&app.address, case, body.clone()).await?;
-        let errors = response["errors"].clone();
+        let response = send_request(&case, &app.address, &body).await?;
+        let errors = response.data["errors"].clone();
 
         assert_json_include!(
             actual: errors,
@@ -359,9 +337,7 @@ async fn mutation_login_with_unknown_customer_errors() -> Result<()> {
 #[actix_rt::test]
 async fn mutation_login_with_invalid_credentials_errors() -> Result<()> {
     let app = spawn_app().await;
-    let customer_details = insert_default_customer(&app.db_pool).await?;
-    let tokens = get_anonymous_token(&app.db_pool).await?;
-    assert_ne!(tokens.cart_id, customer_details.cart_id.clone().unwrap());
+    let _customer_details = insert_default_customer(&app.db_pool).await?;
 
     let graphql_mutatation = format!(
         r#"
@@ -382,12 +358,16 @@ async fn mutation_login_with_invalid_credentials_errors() -> Result<()> {
         }
     });
 
+    let client = build_http_client()?;
+    get_anonymous_token(&client, &app.address).await?;
+
     // [ No tokens | Anonymous Tokens ]
-    let test_cases = vec![None, Some(tokens.tokens.access_token.as_str())];
+    // One client holds no tokens in cookies, the other holds anonymous tokens
+    let test_cases = vec![build_http_client()?, client];
 
     for case in test_cases.into_iter() {
-        let response = send_request(&app.address, case, body.clone()).await?;
-        let errors = response["errors"].clone();
+        let response = send_request(&case, &app.address, &body).await?;
+        let errors = response.data["errors"].clone();
 
         assert_json_include!(
             actual: errors,
@@ -407,6 +387,7 @@ async fn mutation_login_with_invalid_credentials_errors() -> Result<()> {
 #[actix_rt::test]
 async fn mutation_anonymous_login_works() -> Result<()> {
     let app = spawn_app().await;
+    let client = build_http_client()?;
 
     let graphql_mutatation = format!(
         r#"
@@ -423,22 +404,13 @@ async fn mutation_anonymous_login_works() -> Result<()> {
         "query": graphql_mutatation,
     });
 
-    let response = send_request(&app.address, None, body.clone()).await?;
-    let returned_tokens = response["data"]["anonymousLogin"].clone();
+    let response = send_request(&client, &app.address, &body).await?;
+    let returned_tokens = response.data["data"]["anonymousLogin"].clone();
 
     let issued_at = &returned_tokens["issuedAt"];
-    let access_token = &returned_tokens["accessToken"]
-        .as_str()
-        .expect("should have valid access token");
-    let refresh_token = &returned_tokens["refreshToken"]
-        .as_str()
-        .expect("should have valid refresh_token");
     assert!(issued_at.as_u64().expect("should have valid number") > 1_000_000);
-    assert!(access_token.len() > 20);
-    assert!(refresh_token.len() > 20);
-    let access_token = decode_token(access_token, TokenType::Access)?;
-    let refresh_token = decode_token(refresh_token, TokenType::Refresh(0))?;
-    assert_eq!(access_token.claims.cart_id, refresh_token.claims.cart_id);
+    assert_some!(response.cookies.access);
+    assert_some!(response.cookies.refresh);
 
     Ok(())
 }
@@ -446,7 +418,8 @@ async fn mutation_anonymous_login_works() -> Result<()> {
 #[actix_rt::test]
 async fn mutation_update_customer_works() -> Result<()> {
     let app = spawn_app().await;
-    let tokens = get_known_token(&app.db_pool).await?;
+    let client = build_http_client()?;
+    let _customer = sign_user_up_and_get_known_token(&client, &app.address).await?;
 
     let graphql_mutatation = format!(
         r#"
@@ -478,13 +451,13 @@ async fn mutation_update_customer_works() -> Result<()> {
     ];
     let expected = vec![
         json!({
-            "firstName": "Bruce",
-            "lastName": "Wayne",
+            "firstName": "Clark",
+            "lastName": "Kent",
             "email": "updated@test.com"
         }),
         json!({
             "firstName": "Updated",
-            "lastName": "Wayne",
+            "lastName": "Kent",
             "email": "updated@test.com"
         }),
         json!({
@@ -503,12 +476,11 @@ async fn mutation_update_customer_works() -> Result<()> {
         let body = json!({
             "query": graphql_mutatation,
             "variables": {
-                "id": tokens.customer.public_id.clone().unwrap(),
                 "update": case
             }
         });
-        let response = send_request(&app.address, Some(&tokens.tokens.access_token), body).await?;
-        let data = response["data"]["updateCustomer"].clone();
+        let response = send_request(&client, &app.address, &body).await?;
+        let data = response.data["data"]["updateCustomer"].clone();
 
         assert_json_include!(actual: &data, expected: expected);
 
@@ -526,7 +498,6 @@ async fn mutation_update_customer_works() -> Result<()> {
 #[actix_rt::test]
 async fn mutation_update_customer_without_known_token_errors() -> Result<()> {
     let app = spawn_app().await;
-    let tokens = get_anonymous_token(&app.db_pool).await?;
 
     let graphql_mutatation = format!(
         r#"
@@ -551,15 +522,19 @@ async fn mutation_update_customer_without_known_token_errors() -> Result<()> {
             }
     });
 
-    // [ No Token | Anonymous Token ]
-    let test_cases = vec![None, Some(tokens.tokens.access_token.as_str())];
+    let client = build_http_client()?;
+    get_anonymous_token(&client, &app.address).await?;
+
+    // [ No tokens | Anonymous Tokens ]
+    // One client holds no tokens in cookies, the other holds anonymous tokens
+    let test_cases = vec![build_http_client()?, client];
     let expected = vec![
         json!([{
             "message": "Invalid token provided",
             "extensions": {
                 "status": 401,
                 "statusText": "INVALID_TOKEN",
-                "details": "No token was found"
+                "details": "No token found"
             }
         }]),
         json!([{
@@ -571,9 +546,9 @@ async fn mutation_update_customer_without_known_token_errors() -> Result<()> {
         }]),
     ];
 
-    for (token, expected) in test_cases.into_iter().zip(expected.into_iter()) {
-        let response = send_request(&app.address, token, body.clone()).await?;
-        let errors = response["errors"].clone();
+    for (client, expected) in test_cases.into_iter().zip(expected.into_iter()) {
+        let response = send_request(&client, &app.address, &body).await?;
+        let errors = response.data["errors"].clone();
         assert_json_include!(actual: errors, expected: expected);
     }
 
@@ -583,12 +558,10 @@ async fn mutation_update_customer_without_known_token_errors() -> Result<()> {
 #[actix_rt::test]
 async fn mutation_add_item_to_cart_works() -> Result<()> {
     let app = spawn_app().await;
-    let anonymous_tokens = get_anonymous_token(&app.db_pool).await?;
-    let customer_details = get_known_token(&app.db_pool).await?;
-    assert_ne!(
-        anonymous_tokens.cart_id,
-        customer_details.customer.cart_id.clone().unwrap()
-    );
+    let anon_client = build_http_client()?;
+    let anon_customer = get_anonymous_token(&anon_client, &app.address).await?;
+    let known_client = build_http_client()?;
+    let known_customer = sign_user_up_and_get_known_token(&known_client, &app.address).await?;
 
     let graphql_mutatation = format!(
         r#"
@@ -611,14 +584,11 @@ async fn mutation_add_item_to_cart_works() -> Result<()> {
         }
     });
 
-    let test_cases = vec![
-        Some(anonymous_tokens.tokens.access_token.as_str()),
-        Some(customer_details.tokens.access_token.as_str()),
-    ];
+    let test_cases = vec![anon_client, known_client];
 
     let expected = vec![
         json!({
-            "id": anonymous_tokens.cart_id,
+            "id": anon_customer.cart_id.unwrap(),
             "currency": "GBP",
             "cartType": "ANONYMOUS",
             "items": [{
@@ -629,7 +599,7 @@ async fn mutation_add_item_to_cart_works() -> Result<()> {
             }],
         }),
         json!({
-            "id": customer_details.customer.cart_id.clone().unwrap(),
+            "id": known_customer.cart_id.unwrap(),
             "currency": "GBP",
             "cartType": "KNOWN",
             "items": [{
@@ -641,9 +611,9 @@ async fn mutation_add_item_to_cart_works() -> Result<()> {
         }),
     ];
 
-    for (case, expected) in test_cases.into_iter().zip(expected.into_iter()) {
-        let response = send_request(&app.address, case, body.clone()).await?;
-        let cart = response["data"]["addItemsToCart"].clone();
+    for (client, expected) in test_cases.into_iter().zip(expected.into_iter()) {
+        let response = send_request(&client, &app.address, &body).await?;
+        let cart = response.data["data"]["addItemsToCart"].clone();
 
         assert_json_include!(actual: &cart, expected: &expected);
         assert_on_decimal(cart["priceBeforeDiscounts"].as_f64().unwrap(), 2.97);
@@ -667,15 +637,18 @@ async fn mutation_add_item_to_cart_works() -> Result<()> {
 #[actix_rt::test]
 async fn mutation_remove_item_from_cart_completely_removes_negative_quantities() -> Result<()> {
     let app = spawn_app().await;
-    let anonymous_tokens = get_anonymous_token(&app.db_pool).await?;
-    let customer_details = get_known_token(&app.db_pool).await?;
-    assert_ne!(
-        anonymous_tokens.cart_id,
-        customer_details.customer.cart_id.clone().unwrap()
-    );
+
+    let anon_client = build_http_client()?;
+    let anon_customer = get_anonymous_token(&anon_client, &app.address).await?;
+    let anon_cart_id = anon_customer.cart_id.clone().unwrap();
+
+    let known_client = build_http_client()?;
+    let known_customer = sign_user_up_and_get_known_token(&known_client, &app.address).await?;
+    let known_cart_id = known_customer.cart_id.clone().unwrap();
+    assert_ne!(anon_cart_id, known_cart_id);
 
     let cart = ShoppingCart::edit_cart_items::<ShoppingCartDatabase, CartItemDatabase>(
-        anonymous_tokens.cart_id,
+        anon_cart_id,
         vec![InternalCartItem {
             sku: "12345678".to_string(),
             quantity: 1,
@@ -688,7 +661,7 @@ async fn mutation_remove_item_from_cart_completely_removes_negative_quantities()
     assert!(cart.price_before_discounts > 0f64);
 
     let cart = ShoppingCart::edit_cart_items::<ShoppingCartDatabase, CartItemDatabase>(
-        customer_details.customer.cart_id.clone().unwrap(),
+        known_cart_id,
         vec![InternalCartItem {
             sku: "12345678".to_string(),
             quantity: 1,
@@ -722,14 +695,11 @@ async fn mutation_remove_item_from_cart_completely_removes_negative_quantities()
         }
     });
 
-    let test_cases = vec![
-        Some(anonymous_tokens.tokens.access_token.as_str()),
-        Some(customer_details.tokens.access_token.as_str()),
-    ];
+    let test_cases = vec![anon_client, known_client];
 
     let expected = vec![
         json!({
-            "id": anonymous_tokens.cart_id,
+            "id": anon_cart_id,
             "currency": "GBP",
             "cartType": "ANONYMOUS",
             "items": [],
@@ -737,7 +707,7 @@ async fn mutation_remove_item_from_cart_completely_removes_negative_quantities()
             "priceAfterDiscounts": 0.0
         }),
         json!({
-            "id": customer_details.customer.cart_id.clone().unwrap(),
+            "id": known_cart_id,
             "currency": "GBP",
             "cartType": "KNOWN",
             "items": [],
@@ -746,9 +716,9 @@ async fn mutation_remove_item_from_cart_completely_removes_negative_quantities()
         }),
     ];
 
-    for (case, expected) in test_cases.into_iter().zip(expected.into_iter()) {
-        let response = send_request(&app.address, case, body.clone()).await?;
-        let cart = response["data"]["removeItemsFromCart"].clone();
+    for (client, expected) in test_cases.into_iter().zip(expected.into_iter()) {
+        let response = send_request(&client, &app.address, &body).await?;
+        let cart = response.data["data"]["removeItemsFromCart"].clone();
 
         assert_json_include!(actual: &cart, expected: &expected);
 
@@ -769,15 +739,18 @@ async fn mutation_remove_item_from_cart_completely_removes_negative_quantities()
 #[actix_rt::test]
 async fn mutation_remove_items_from_cart_correctly_handles_leftover_items() -> Result<()> {
     let app = spawn_app().await;
-    let anonymous_tokens = get_anonymous_token(&app.db_pool).await?;
-    let customer_details = get_known_token(&app.db_pool).await?;
-    assert_ne!(
-        anonymous_tokens.cart_id,
-        customer_details.customer.cart_id.clone().unwrap()
-    );
+
+    let anon_client = build_http_client()?;
+    let anon_customer = get_anonymous_token(&anon_client, &app.address).await?;
+    let anon_cart_id = anon_customer.cart_id.clone().unwrap();
+
+    let known_client = build_http_client()?;
+    let known_customer = sign_user_up_and_get_known_token(&known_client, &app.address).await?;
+    let known_cart_id = known_customer.cart_id.clone().unwrap();
+    assert_ne!(anon_cart_id, known_cart_id);
 
     let cart = ShoppingCart::edit_cart_items::<ShoppingCartDatabase, CartItemDatabase>(
-        anonymous_tokens.cart_id,
+        anon_cart_id,
         vec![
             InternalCartItem {
                 sku: "12345678".to_string(),
@@ -796,7 +769,7 @@ async fn mutation_remove_items_from_cart_correctly_handles_leftover_items() -> R
     assert!(cart.price_before_discounts > 0f64);
 
     let cart = ShoppingCart::edit_cart_items::<ShoppingCartDatabase, CartItemDatabase>(
-        customer_details.customer.cart_id.clone().unwrap(),
+        known_cart_id,
         vec![
             InternalCartItem {
                 sku: "12345678".to_string(),
@@ -835,14 +808,11 @@ async fn mutation_remove_items_from_cart_correctly_handles_leftover_items() -> R
         }
     });
 
-    let test_cases = vec![
-        Some(anonymous_tokens.tokens.access_token.as_str()),
-        Some(customer_details.tokens.access_token.as_str()),
-    ];
+    let test_cases = vec![anon_client, known_client];
 
     let expected = vec![
         json!({
-            "id": anonymous_tokens.cart_id,
+            "id": anon_cart_id,
             "currency": "GBP",
             "cartType": "ANONYMOUS",
             "items": [
@@ -861,7 +831,7 @@ async fn mutation_remove_items_from_cart_correctly_handles_leftover_items() -> R
             ],
         }),
         json!({
-            "id": customer_details.customer.cart_id.clone().unwrap(),
+            "id": known_cart_id,
             "currency": "GBP",
             "cartType": "KNOWN",
             "items": [
@@ -881,9 +851,9 @@ async fn mutation_remove_items_from_cart_correctly_handles_leftover_items() -> R
         }),
     ];
 
-    for (case, expected) in test_cases.into_iter().zip(expected.into_iter()) {
-        let response = send_request(&app.address, case, body.clone()).await?;
-        let cart = response["data"]["removeItemsFromCart"].clone();
+    for (client, expected) in test_cases.into_iter().zip(expected.into_iter()) {
+        let response = send_request(&client, &app.address, &body).await?;
+        let cart = response.data["data"]["removeItemsFromCart"].clone();
 
         assert_json_include!(actual: &cart, expected: &expected);
         assert_on_decimal(cart["priceBeforeDiscounts"].as_f64().unwrap(), 22.98);

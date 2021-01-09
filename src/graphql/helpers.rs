@@ -22,7 +22,7 @@ impl<'a> GraphqlContext<'a> {
     pub fn access_token(&mut self) -> Result<BazaarToken> {
         if self.access_token.is_none() {
             error!(err = "no access token was found", "no access token found");
-            return Err(BazaarError::Unauthorized);
+            return Err(BazaarError::InvalidToken("Not found".to_owned()));
         }
         self.access_token
             .take()
@@ -32,7 +32,7 @@ impl<'a> GraphqlContext<'a> {
     pub fn refresh_token(&mut self) -> Result<BazaarToken> {
         if self.refresh_token.is_none() {
             error!(err = "no refresh token was found", "no refresh token found");
-            return Err(BazaarError::Unauthorized);
+            return Err(BazaarError::InvalidToken("Not found".to_owned()));
         }
         self.refresh_token
             .take()
@@ -95,13 +95,13 @@ pub async fn extract_token(
         if let Some(access_cookie) = cookies.get_access_cookie()? {
             return verify_and_deserialize_token::<AuthDatabase>(access_cookie, token_type, pool)
                 .await;
-        }
+        };
     }
     if let Some(refresh_cookie) = cookies.get_refresh_cookie()? {
         return verify_and_deserialize_token::<AuthDatabase>(refresh_cookie, token_type, pool)
             .await;
     }
-    Err(BazaarError::Unauthorized)
+    Err(BazaarError::InvalidToken("No token found".to_owned()))
 }
 
 pub fn extract_database_pool<'a>(context: &'a Context<'_>) -> Result<&'a PgPool> {

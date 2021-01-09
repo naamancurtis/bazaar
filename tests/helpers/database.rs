@@ -55,6 +55,8 @@ pub async fn insert_default_customer(pool: &PgPool) -> Result<CustomerData> {
         cart_id: Some(ids.cart_id),
         email: Some(email.to_owned()),
         password: Some(password.to_owned()),
+        first_name: Some(String::from("Bruce")),
+        last_name: Some(String::from("Wayne")),
     };
     Ok(customer)
 }

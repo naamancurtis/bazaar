@@ -30,7 +30,9 @@ impl QueryRoot {
         let mut context = extract_token_and_database_pool(ctx, true, false)
             .await
             .map_err(|e| e.extend())?;
+        dbg!("made it past context");
         let token = context.access_token().map_err(|e| e.extend())?;
+        dbg!(&token);
         let pool = context.pool;
 
         if let Some(id) = token.id {

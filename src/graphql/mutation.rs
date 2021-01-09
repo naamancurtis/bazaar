@@ -56,6 +56,7 @@ impl MutationRoot {
             pool,
         )
         .await?;
+
         // If the customer did some browsing while anonymous (ie. the token is valid), need
         // to merge the two carts together
         if let Some(anonymous_cart_id) = anonymous_cart_id {
