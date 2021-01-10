@@ -6,7 +6,7 @@ use tracing::error;
 use uuid::Uuid;
 
 use crate::{
-    auth::{generate_new_tokens, verify_password_and_fetch_details},
+    auth::{generate_new_tokens, refresh_tokens, verify_password_and_fetch_details},
     database::{AuthDatabase, CartItemDatabase, CustomerDatabase, ShoppingCartDatabase},
     graphql::{extract_token_and_database_pool, validators::ValidCustomerUpdateType},
     models::{
@@ -111,6 +111,33 @@ impl MutationRoot {
             Some(tokens.access_token.clone()),
             Some(tokens.refresh_token.clone()),
         )?;
+        Ok(tokens)
+    }
+
+    #[tracing::instrument(skip(self, ctx))]
+    async fn refresh(&self, ctx: &Context<'_>) -> Result<BazaarTokens> {
+        let mut context = extract_token_and_database_pool(ctx, true, true)
+            .await
+            .map_err(|e| e.extend())?;
+        let refresh_token = context.refresh_token()?;
+        let raw_refresh_token = context.refresh_token_raw.clone().expect(
+            "if the refresh token is valid then there should have been a valid raw token too",
+        );
+        let pool = context.pool;
+
+        let tokens = refresh_tokens::<AuthDatabase, CustomerDatabase>(
+            refresh_token,
+            raw_refresh_token,
+            pool,
+        )
+        .await?;
+
+        // @TODO - Refactor all this to avoid the cloning
+        context.set_new_cookies(
+            Some(tokens.access_token.clone()),
+            Some(tokens.refresh_token.clone()),
+        )?;
+
         Ok(tokens)
     }
 

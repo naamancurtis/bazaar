@@ -13,6 +13,8 @@ use bazaar::{
 mod helpers;
 use helpers::*;
 
+// @TODO Add in tests for Refresh
+
 #[actix_rt::test]
 async fn mutation_sign_up_without_token_works() -> Result<()> {
     let app = spawn_app().await;
@@ -870,6 +872,59 @@ async fn mutation_remove_items_from_cart_correctly_handles_leftover_items() -> R
         .expect("should be able to fetch cart");
         assert_eq!(cart.items.len(), 2);
         assert!(cart.price_before_discounts < 23.0);
+    }
+
+    Ok(())
+}
+
+#[actix_rt::test]
+async fn mutation_refresh_works() -> Result<()> {
+    let app = spawn_app().await;
+    let anon_client = build_http_client()?;
+    let anon_customer = get_anonymous_token(&anon_client, &app.address).await?;
+    let known_client = build_http_client()?;
+    let known_customer = sign_user_up_and_get_known_token(&known_client, &app.address).await?;
+
+    let graphql_mutatation = format!(
+        r#"
+        mutation refresh {{
+            refresh {{
+               {} 
+            }}
+        }}
+    "#,
+        TOKEN_GRAPHQL_FIELDS,
+    );
+
+    let body = json!({
+        "query": graphql_mutatation,
+    });
+
+    let cases = vec![anon_client, known_client];
+    let cmp_tokens = vec![
+        (
+            anon_customer.raw_access_token,
+            anon_customer.raw_refresh_token,
+        ),
+        (
+            known_customer.raw_access_token,
+            known_customer.raw_refresh_token,
+        ),
+    ];
+
+    for (client, (access, refresh)) in cases.into_iter().zip(cmp_tokens.into_iter()) {
+        let response = send_request(&client, &app.address, &body).await?;
+        let returned_tokens = response.data["data"]["refresh"].clone();
+
+        let issued_at = &returned_tokens["issuedAt"];
+        assert!(issued_at.as_u64().expect("should have valid number") > 1_000_000);
+        assert_some!(response.cookies.access);
+        assert_some!(response.cookies.refresh);
+
+        // Due the timer on refresh tokens, the access token should be refreshed
+        // but the refresh token should not have been
+        assert_ne!(response.cookies.raw_access, access);
+        assert_eq!(response.cookies.raw_refresh, refresh);
     }
 
     Ok(())

@@ -51,16 +51,16 @@ lazy_static! {
 }
 
 #[tracing::instrument(skip(token, pool))]
-pub async fn verify_and_deserialize_token<R: AuthRepository>(
-    token: String,
+pub async fn verify_and_deserialize_token<DB: AuthRepository>(
+    token: &str,
     token_type: TokenType,
     pool: &PgPool,
 ) -> Result<BazaarToken, BazaarError> {
     if token.is_empty() {
         return Err(BazaarError::InvalidToken("No token was found".to_owned()));
     }
-    let mut token_data = decode_token(&token, token_type)?;
-    let id = R::map_id(token_data.claims.sub, pool).await?;
+    let mut token_data = decode_token(token, token_type)?;
+    let id = DB::map_id(token_data.claims.sub, pool).await?;
     token_data.claims.id = id;
     Ok(BazaarToken::from(token_data))
 }
@@ -167,8 +167,6 @@ mod tests {
         let decoding_key = DecodingKey::from_rsa_pem(ACCESS_TOKEN_PUBLIC_KEY.as_bytes()).unwrap();
         let decoded_token =
             decode::<Claims>(&token, &decoding_key, &Validation::new(Algorithm::PS256)).unwrap();
-        dbg!(&decoded_token.header);
-        dbg!(&decoded_token.claims);
         assert_eq!(decoded_token.claims, claims);
     }
 
@@ -181,8 +179,6 @@ mod tests {
         let decoding_key = DecodingKey::from_rsa_pem(REFRESH_TOKEN_PUBLIC_KEY.as_bytes()).unwrap();
         let decoded_token =
             decode::<Claims>(&token, &decoding_key, &Validation::new(Algorithm::PS256)).unwrap();
-        dbg!(&decoded_token.header);
-        dbg!(&decoded_token.claims);
         assert_eq!(decoded_token.claims.sub, user_id);
         assert_eq!(decoded_token.claims.cart_id, cart_id);
         assert_eq!(decoded_token.claims.customer_type, CustomerType::Anonymous);
@@ -199,8 +195,6 @@ mod tests {
         let decoded_token = decode_token(&token, TokenType::Access);
         assert_ok!(&decoded_token);
         let decoded_token = decoded_token.unwrap();
-        dbg!(&decoded_token.header);
-        dbg!(&decoded_token.claims);
         assert_eq!(claims, decoded_token.claims);
     }
 
@@ -224,7 +218,7 @@ mod tests {
         let config = crate::get_configuration().expect("failed to read config");
         let pool = PgPool::connect_lazy(&config.database.raw_pg_url())
             .expect("failed to create fake connection");
-        let result = verify_and_deserialize_token::<MockAuthRepo>(token, TokenType::Access, &pool)
+        let result = verify_and_deserialize_token::<MockAuthRepo>(&token, TokenType::Access, &pool)
             .await
             .expect("should successfully parse a valid token");
         assert_some!(result.id);
@@ -240,7 +234,7 @@ mod tests {
         let pool = PgPool::connect_lazy(&config.database.raw_pg_url())
             .expect("failed to create fake connection");
         let result =
-            verify_and_deserialize_token::<MockAuthRepo>(token, TokenType::Access, &pool).await;
+            verify_and_deserialize_token::<MockAuthRepo>(&token, TokenType::Access, &pool).await;
 
         assert_err!(&result);
         let err = result.unwrap_err();
@@ -259,7 +253,7 @@ mod tests {
         let pool = PgPool::connect_lazy(&config.database.raw_pg_url())
             .expect("failed to create fake connection");
         let result =
-            verify_and_deserialize_token::<MockAuthRepo>(token, TokenType::Access, &pool).await;
+            verify_and_deserialize_token::<MockAuthRepo>(&token, TokenType::Access, &pool).await;
         assert_err!(&result);
         let err = result.unwrap_err();
 

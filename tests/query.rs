@@ -6,10 +6,11 @@ mod helpers;
 use helpers::*;
 
 #[actix_rt::test]
-async fn query_customer_fails_for_anonymous_user() -> Result<()> {
+async fn query_customer_fails_for_an_unknown_user() -> Result<()> {
     let app = spawn_app().await;
-    let client = build_http_client()?;
-    let _customer = get_anonymous_token(&client, &app.address).await?;
+    let unauth_client = build_http_client()?;
+    let anon_client = build_http_client()?;
+    let _customer = get_anonymous_token(&anon_client, &app.address).await?;
 
     let graphql_mutatation = format!(
         r#"
@@ -25,20 +26,30 @@ async fn query_customer_fails_for_anonymous_user() -> Result<()> {
     let body = json!({
         "query": graphql_mutatation,
     });
-
-    let response = send_request(&client, &app.address, &body).await?;
-
-    let errors = response.data["errors"].clone();
-    assert_json_include!(
-        actual: errors,
-        expected: json!([{
+    let cases = vec![unauth_client, anon_client];
+    let expected = vec![
+        json!([{
+            "message": "Invalid token provided",
+            "extensions": {
+                "status": 401,
+                "statusText": "INVALID_TOKEN"
+            }
+        }]),
+        json!([{
             "message": "Anonymous users do not have access to this resource",
             "extensions": {
                 "status": 401,
                 "statusText": "UNAUTHORIZED"
             }
-        }])
-    );
+        }]),
+    ];
+    for (client, expected) in cases.into_iter().zip(expected.into_iter()) {
+        let response = send_request(&client, &app.address, &body).await?;
+
+        let errors = response.data["errors"].clone();
+        assert_json_include!(actual: errors, expected: &expected);
+    }
+
     Ok(())
 }
 
@@ -198,6 +209,20 @@ async fn query_cart_works_for_known_user() -> Result<()> {
             "items": [],
         })
     );
+
+    Ok(())
+}
+
+#[actix_rt::test]
+async fn query_health_check_works() -> Result<()> {
+    let app = spawn_app().await;
+    let client = build_http_client()?;
+
+    let body = json!({ "query": "{ healthCheck }" });
+    let response = send_request(&client, &app.address, &body).await?;
+
+    let data = response.data["data"]["healthCheck"].clone();
+    assert_json_include!(actual: data, expected: true);
 
     Ok(())
 }

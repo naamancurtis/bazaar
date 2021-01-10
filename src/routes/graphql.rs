@@ -18,19 +18,8 @@ pub async fn graphql_index(
     http_request: HttpRequest,
     graphql_request: Request,
 ) -> Result<HttpResponse> {
-    // // Extract the token from the header
-    // // If it exists, attach it to the context
-    // // if it doesn't exist, nothing will be attached to the context
-    // let token = http_request
-    //     .headers()
-    //     .get("Authorization")
-    //     .and_then(|token| {
-    //         token
-    //             .to_str()
-    //             .ok()
-    //             .map(|t| BearerToken::try_from(t.to_string()).ok())
-    //             .flatten()
-    //     });
+    // For every request, tokens are extracted and attached to the graphql context
+    // under the type `Arc<BazaarCookies`
     let access_cookie = http_request
         .cookie(TokenType::Access.as_str())
         .map(|c| c.value().to_string());
@@ -93,13 +82,13 @@ fn set_cookie_on_response(
             if env == "local" {
                 ""
             } else {
-                "Secure;"
+                "Secure; "
             }
         } else {
-            "Secure;"
+            "Secure; "
         };
         let cookie_string = format!(
-            "{}={}; {} HttpOnly; MaxAge={}",
+            "{}={}; {}HttpOnly; MaxAge={}",
             token_type.as_str(),
             cookie,
             secure,

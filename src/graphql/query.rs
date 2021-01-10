@@ -13,6 +13,10 @@ pub struct QueryRoot;
 
 #[Object]
 impl QueryRoot {
+    async fn health_check(&self, _ctx: &Context<'_>) -> bool {
+        true
+    }
+
     // @TODO Remove this - only here for QoL while developing
     #[tracing::instrument(name = "get_customers", skip(self, ctx))]
     async fn customers(&self, ctx: &Context<'_>) -> Result<Vec<Customer>> {
@@ -30,9 +34,7 @@ impl QueryRoot {
         let mut context = extract_token_and_database_pool(ctx, true, false)
             .await
             .map_err(|e| e.extend())?;
-        dbg!("made it past context");
         let token = context.access_token().map_err(|e| e.extend())?;
-        dbg!(&token);
         let pool = context.pool;
 
         if let Some(id) = token.id {
@@ -42,7 +44,9 @@ impl QueryRoot {
                     error!(?err, "failed to find customer");
                     BazaarError::NotFound.extend()
                 })?;
-            customer.id = token.public_id();
+            customer.id = token
+                .public_id()
+                .expect("valid token should always have public id");
             return Ok(customer);
         }
         if token.customer_type == CustomerType::Anonymous {

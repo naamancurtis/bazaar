@@ -13,29 +13,32 @@ use crate::{
 pub struct GraphqlContext<'a> {
     pub pool: &'a PgPool,
     access_token: Option<Result<BazaarToken>>,
+    pub(crate) access_token_raw: Option<String>,
     refresh_token: Option<Result<BazaarToken>>,
+    pub(crate) refresh_token_raw: Option<String>,
     cookies: &'a Arc<BazaarCookies>,
 }
 
 impl<'a> GraphqlContext<'a> {
-    /// Consumes the access token from the context, returning it
+    /// Returns the access token from the context
     pub fn access_token(&mut self) -> Result<BazaarToken> {
         if self.access_token.is_none() {
             error!(err = "no access token was found", "no access token found");
             return Err(BazaarError::InvalidToken("Not found".to_owned()));
         }
         self.access_token
-            .take()
+            .clone()
             .expect("already checked that it is some")
     }
 
+    /// Returns the refresh token from the context
     pub fn refresh_token(&mut self) -> Result<BazaarToken> {
         if self.refresh_token.is_none() {
             error!(err = "no refresh token was found", "no refresh token found");
             return Err(BazaarError::InvalidToken("Not found".to_owned()));
         }
         self.refresh_token
-            .take()
+            .clone()
             .expect("already checked that it is some")
     }
 
@@ -70,16 +73,21 @@ pub async fn extract_token_and_database_pool<'a>(
     let mut result = GraphqlContext {
         pool,
         access_token: None,
+        access_token_raw: cookies.get_access_cookie()?,
         refresh_token: None,
+        refresh_token_raw: cookies.get_refresh_cookie()?,
         cookies: &cookies,
     };
     if extract_access_token {
-        result.access_token = Some(extract_token(&cookies, TokenType::Access, pool).await);
+        result.access_token =
+            Some(extract_token(&result.access_token_raw, TokenType::Access, pool).await);
     }
     if extract_refresh_token {
-        result.refresh_token = Some(extract_token(&cookies, TokenType::Refresh(0), pool).await);
+        result.refresh_token =
+            Some(extract_token(&result.refresh_token_raw, TokenType::Refresh(0), pool).await);
     }
 
+    // @TODO Remove this once async-graphql is updated
     // Now we have extracted the access tokens from the cookies, we will set the context state to
     // `None`, ready to decide whether we need to change the cookies on the response
     cookies.set_cookies_to_not_be_changed()?;
@@ -87,19 +95,12 @@ pub async fn extract_token_and_database_pool<'a>(
 }
 
 pub async fn extract_token(
-    cookies: &BazaarCookies,
+    cookie_raw: &Option<String>,
     token_type: TokenType,
     pool: &PgPool,
 ) -> Result<BazaarToken> {
-    if token_type == TokenType::Access {
-        if let Some(access_cookie) = cookies.get_access_cookie()? {
-            return verify_and_deserialize_token::<AuthDatabase>(access_cookie, token_type, pool)
-                .await;
-        };
-    }
-    if let Some(refresh_cookie) = cookies.get_refresh_cookie()? {
-        return verify_and_deserialize_token::<AuthDatabase>(refresh_cookie, token_type, pool)
-            .await;
+    if let Some(cookie) = cookie_raw {
+        return verify_and_deserialize_token::<AuthDatabase>(cookie, token_type, pool).await;
     }
     Err(BazaarError::InvalidToken("No token found".to_owned()))
 }

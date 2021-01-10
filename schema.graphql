@@ -1,4 +1,5 @@
 type QueryRoot {
+	healthCheck: Boolean!
 	customers: [Customer!]!
 	customer: Customer!
 	cart: ShoppingCart!
@@ -53,6 +54,7 @@ type CartItem {
 type MutationRoot {
 	login(email: String!, password: String!): BazaarTokens!
 	anonymousLogin: BazaarTokens!
+	refresh: BazaarTokens!
 	signUp(email: String!, password: String!, firstName: String!, lastName: String!): BazaarTokens!
 	updateCustomer(update: [CustomerUpdate!]!): Customer!
 	addItemsToCart(newItems: [UpdateCartItem!]!): ShoppingCart!

@@ -4,7 +4,7 @@ use serde::Serialize;
 use thiserror::Error;
 use tracing::error;
 
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error, PartialEq, Clone)]
 pub enum BazaarError {
     #[error("Could not find resource")]
     NotFound,

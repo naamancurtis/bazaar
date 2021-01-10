@@ -6,7 +6,7 @@
 
 Bazaar is a fully async GraphQL Server written in Rust using `Actix Web`,
 `Async-GraphQL` and `SQLx`. It implements the basic functionality you would
-expect to find on an **e-commerce platform** [(see below for more details)](#functionality).
+expect to find on an **e-commerce platform** [(see below for more details)](https://github.com/naamancurtis/bazaar/blob/main/functionality.md).
 
 It's my hope that this project will be a useful example for others to see how to compose a production ready Rust
 application from some of the awesome crates in the ecosystem, along with how various
@@ -25,42 +25,11 @@ raise an issue on the repo.
 - Stock & Stock Management - Will be included via some stub functionality
 - Checkout & Payments - This might be included in the future
 
-## Functionality
-
-### Cart Management
-
-As a customer, I want to be able to add items to my cart so that I can purchase
-them.
-
-As a customer, I want to be able to remove items from my cart so that I can purchase
-them.
-
-As a customer, I want to be able to view all the items in my cart and see how
-much they would cost me, so that I can decide to purchase them or not
-
-### Customer Management
-
-As a customer, I want to be able to log in at any point and have the items I
-have in my cart maintained, so that I don't have to go back and re-add them.
-
-As a customer, I want to be able to log out of my account so that I know the
-device I am on no longer has access to my account.
-
-As a logged in customer, I want to be able to view my personal details so that I
-can verify they're correct.
-
-As a logged in customer, I want to be able to edit my personal details so that I
-can keep them up to date.
-
-### Authentication
-
-_Breaking the User Story type requirements to explain what's going on here._
-
-Authentication in the application has been implemented with Access & Refresh **JSON Web Tokens**.
-Where **Access tokens** are short lived and irrevocable and **Refresh tokens** are longer lived and
-revocable.
-
 ## Running the App
+
+The app requires a running instance of PostGres, the easiest way to set this up
+is to run the `./scripts/init_db.sh` script, which will pull down the latest
+docker postgres image, start it up, and run the migrations.
 
 ### Docker
 
@@ -68,26 +37,6 @@ revocable.
 docker build --tag bazaar --file Dockerfile .
 docker run -p 8000:8000 bazaar
 ```
-
-### CI
-
-The CI pipeline includes checks on `sqlx-data.json`, if
-it detects that there have been changes without updating this file it will fail CI. See [preparing for SQLx offline below](#preparing_for_sqlx_offline) for more details.
-
-### GraphQL Schema
-
-_Although it's not pretty_ there's a small binary in the workspace which can be
-used to generate the graphql schema for the application and write it to
-`schema.graphql`. To do so just run `cargo run --bin schema`. The easiest way to
-keep it up to date is to create a basic `pre-commit` hook to run it for you.
-
-### Tooling
-
-| Name                                                                 | Purpose                                                                   | Installation                                    |
-| -------------------------------------------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------- |
-| [SQLx CLI](https://github.com/launchbadge/sqlx/tree/master/sqlx-cli) | Database Migrations                                                       | `cargo install --version=0.2.0 sqlx-cli`        |
-| [PSQL](https://formulae.brew.sh/formula/libpq)                       | Used predominately for the utilities of `psql`                            | `brew install libpq && brew link --force libpq` |
-| [direnv](https://github.com/direnv/direnv)                           | This is just a nice way of managing environment variables within projects | `brew install direnv`                           |
 
 ### Environment Variables
 
@@ -103,6 +52,39 @@ need to be set up manually in order to run the application) can be found below
 | Public key for Refresh Token  | `REFRESH_TOKEN_PUBLIC_KEY`  | Holds the public key for verifying the refresh token JWTs | Typical RSA Public Key (`.pem` format)  |
 | Private key for Access Token  | `ACCESS_TOKEN_PRIVATE_KEY`  | Holds the private key for signing the access token JWTs   | Typical RSA Private Key (`.pem` format) |
 | Public key for Access Token   | `ACCESS_TOKEN_PUBLIC_KEY`   | Holds the public key for verifying the access token JWTs  | Typical RSA Public Key (`.pem` format)  |
+
+## CI
+
+The CI pipeline includes checks on `sqlx-data.json`, if
+it detects that there have been changes without updating this file it will fail CI. See [preparing for SQLx offline below](#preparing_for_sqlx_offline) for more details.
+
+## GraphQL Schema Generation
+
+_Although it's not pretty_ there's a small binary in the workspace which can be
+used to generate the graphql schema for the application and write it to
+`schema.graphql`. To do so just run `cargo run --bin schema`. The easiest way to
+keep it up to date is to create a basic `pre-commit` hook to run it for you.
+
+## Tooling
+
+| Name                                                                 | Purpose                                                                   | Installation                                    |
+| -------------------------------------------------------------------- | ------------------------------------------------------------------------- | ----------------------------------------------- |
+| [SQLx CLI](https://github.com/launchbadge/sqlx/tree/master/sqlx-cli) | Database Migrations                                                       | `cargo install --version=0.2.0 sqlx-cli`        |
+| [PSQL](https://formulae.brew.sh/formula/libpq)                       | Used predominately for the utilities of `psql`                            | `brew install libpq && brew link --force libpq` |
+| [direnv](https://github.com/direnv/direnv)                           | This is just a nice way of managing environment variables within projects | `brew install direnv`                           |
+
+## Testing
+
+A majority of the functionality are tested through `integration` tests, found in
+the `/tests` directory. This is to ensure the public API that's exposed behaves
+as intended.
+
+As all authentication is done through `HttpOnly` cookies, you'll generally see a
+pattern where different HTTP Clients (currently [reqwest](https://docs.rs/reqwest/0.11.0/reqwest/index.html))
+are set up throughout the tests, with the client holding the auth cookies as
+appropriate
+
+## Helpful Notes
 
 ### Generating RSA Keys
 

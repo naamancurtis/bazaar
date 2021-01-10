@@ -72,12 +72,8 @@ impl BazaarToken {
     /// that the private ID is not leaked out publically (ie. to overwrite it)
     ///
     /// The public ID shouldn't be used anywhere else within the application
-    pub fn public_id(&self) -> Uuid {
-        if let Some(id) = self.sub {
-            return id;
-        }
-        warn!(public_id = ?self.sub, id = ?self.id, "expected to have valid ID mappings");
-        Uuid::nil()
+    pub fn public_id(&self) -> Option<Uuid> {
+        self.sub
     }
 }
 
