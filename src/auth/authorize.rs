@@ -1,15 +1,17 @@
-use chrono::{Duration, Utc};
+use chrono::Utc;
 use jsonwebtoken::{
     decode, encode, Algorithm, DecodingKey, EncodingKey, Header, TokenData, Validation,
 };
 use lazy_static::lazy_static;
+use sqlx::PgPool;
 use std::env;
 use tracing::error;
 use uuid::Uuid;
 
 use crate::{
     auth::{ACCESS_TOKEN_DURATION, REFRESH_TOKEN_DURATION},
-    models::{Claims, CustomerType, TokenType},
+    database::AuthRepository,
+    models::{BazaarToken, Claims, CustomerType, TokenType},
     BazaarError,
 };
 
@@ -48,6 +50,21 @@ lazy_static! {
     };
 }
 
+#[tracing::instrument(skip(token, pool))]
+pub async fn verify_and_deserialize_token<DB: AuthRepository>(
+    token: &str,
+    token_type: TokenType,
+    pool: &PgPool,
+) -> Result<BazaarToken, BazaarError> {
+    if token.is_empty() {
+        return Err(BazaarError::InvalidToken("No token was found".to_owned()));
+    }
+    let mut token_data = decode_token(token, token_type)?;
+    let id = DB::map_id(token_data.claims.sub, pool).await?;
+    token_data.claims.id = id;
+    Ok(BazaarToken::from(token_data))
+}
+
 #[tracing::instrument]
 pub fn encode_token(
     user_id: Option<Uuid>,
@@ -56,10 +73,10 @@ pub fn encode_token(
 ) -> Result<String, BazaarError> {
     let iat = Utc::now();
     let (exp, count) = if let TokenType::Refresh(count) = token_type {
-        let exp = iat + Duration::seconds(REFRESH_TOKEN_DURATION);
+        let exp = iat + *REFRESH_TOKEN_DURATION;
         (exp, Some(count))
     } else {
-        let exp = iat + Duration::seconds(ACCESS_TOKEN_DURATION);
+        let exp = iat + *ACCESS_TOKEN_DURATION;
         (exp, None)
     };
     let customer_type = if user_id.is_some() {
@@ -121,8 +138,15 @@ pub fn decode_token(token: &str, token_type: TokenType) -> Result<TokenData<Clai
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::test_helpers::{create_valid_jwt_token, set_token_env_vars_for_tests};
-    use claim::assert_ok;
+    use async_trait::async_trait;
+    use chrono::Duration;
+    use claim::{assert_err, assert_ok, assert_some};
+
+    use crate::{
+        models::auth::AuthCustomer,
+        test_helpers::{create_valid_jwt_token, set_token_env_vars_for_tests},
+        Result,
+    };
 
     #[test]
     fn test_encode_jwt() {
@@ -143,8 +167,6 @@ mod tests {
         let decoding_key = DecodingKey::from_rsa_pem(ACCESS_TOKEN_PUBLIC_KEY.as_bytes()).unwrap();
         let decoded_token =
             decode::<Claims>(&token, &decoding_key, &Validation::new(Algorithm::PS256)).unwrap();
-        dbg!(&decoded_token.header);
-        dbg!(&decoded_token.claims);
         assert_eq!(decoded_token.claims, claims);
     }
 
@@ -157,8 +179,6 @@ mod tests {
         let decoding_key = DecodingKey::from_rsa_pem(REFRESH_TOKEN_PUBLIC_KEY.as_bytes()).unwrap();
         let decoded_token =
             decode::<Claims>(&token, &decoding_key, &Validation::new(Algorithm::PS256)).unwrap();
-        dbg!(&decoded_token.header);
-        dbg!(&decoded_token.claims);
         assert_eq!(decoded_token.claims.sub, user_id);
         assert_eq!(decoded_token.claims.cart_id, cart_id);
         assert_eq!(decoded_token.claims.customer_type, CustomerType::Anonymous);
@@ -171,12 +191,77 @@ mod tests {
     #[test]
     fn decode_valid_token() {
         set_token_env_vars_for_tests();
-        let (token, claims) = create_valid_jwt_token(TokenType::Access);
+        let (token, claims) =
+            create_valid_jwt_token(Uuid::new_v4(), Uuid::new_v4(), TokenType::Access);
         let decoded_token = decode_token(&token, TokenType::Access);
         assert_ok!(&decoded_token);
         let decoded_token = decoded_token.unwrap();
-        dbg!(&decoded_token.header);
-        dbg!(&decoded_token.claims);
         assert_eq!(claims, decoded_token.claims);
+    }
+
+    struct MockAuthRepo;
+
+    #[async_trait]
+    impl AuthRepository for MockAuthRepo {
+        async fn map_id(_: Option<Uuid>, _: &PgPool) -> Result<Option<Uuid>> {
+            Ok(Some(Uuid::new_v4()))
+        }
+
+        async fn get_auth_customer(_: &str, _: &PgPool) -> Result<AuthCustomer> {
+            unimplemented!("Not used for these tests");
+        }
+    }
+
+    #[tokio::test]
+    async fn correctly_parses_valid_token() {
+        set_token_env_vars_for_tests();
+        let (token, claims) =
+            create_valid_jwt_token(Uuid::new_v4(), Uuid::new_v4(), TokenType::Access);
+        let config = crate::get_configuration().expect("failed to read config");
+        let pool = PgPool::connect_lazy(&config.database.raw_pg_url())
+            .expect("failed to create fake connection");
+        let result = verify_and_deserialize_token::<MockAuthRepo>(&token, TokenType::Access, &pool)
+            .await
+            .expect("should successfully parse a valid token");
+        assert_some!(result.id);
+        assert_eq!(claims.iat, result.iat);
+        assert_eq!(claims.exp, result.exp);
+    }
+
+    #[tokio::test]
+    async fn rejects_when_no_token_is_provided() {
+        set_token_env_vars_for_tests();
+        let token = String::default();
+        let config = crate::get_configuration().expect("failed to read config");
+        let pool = PgPool::connect_lazy(&config.database.raw_pg_url())
+            .expect("failed to create fake connection");
+        let result =
+            verify_and_deserialize_token::<MockAuthRepo>(&token, TokenType::Access, &pool).await;
+
+        assert_err!(&result);
+        let err = result.unwrap_err();
+
+        assert_eq!(
+            err,
+            BazaarError::InvalidToken("No token was found".to_string())
+        );
+    }
+
+    #[tokio::test]
+    async fn rejects_an_invalid_token_token() {
+        set_token_env_vars_for_tests();
+        let token = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJzdWIiOiIxMjM0NTY3ODkwIiwibmFtZSI6IkpvaG4gRG9lIiwiaWF0IjoxNTE2MjM5MDIyfQ.SflKxwRJSMeKKF2QT4fwpMeJf36POk6yJV_adQssw5c".to_string();
+        let config = crate::get_configuration().expect("failed to read config");
+        let pool = PgPool::connect_lazy(&config.database.raw_pg_url())
+            .expect("failed to create fake connection");
+        let result =
+            verify_and_deserialize_token::<MockAuthRepo>(&token, TokenType::Access, &pool).await;
+        assert_err!(&result);
+        let err = result.unwrap_err();
+
+        assert_eq!(
+            err,
+            BazaarError::InvalidToken("Token did not match what was expected".to_string())
+        );
     }
 }

@@ -27,9 +27,7 @@ createdAt
 
 pub const TOKEN_GRAPHQL_FIELDS: &str = "#
  issuedAt
- accessToken
  accessTokenExpiresIn
- refreshToken
  refreshTokenExpiresIn
  tokenType
  #";

@@ -1,4 +1,5 @@
 type QueryRoot {
+	healthCheck: Boolean!
 	customers: [Customer!]!
 	customer: Customer!
 	cart: ShoppingCart!
@@ -53,6 +54,7 @@ type CartItem {
 type MutationRoot {
 	login(email: String!, password: String!): BazaarTokens!
 	anonymousLogin: BazaarTokens!
+	refresh: BazaarTokens!
 	signUp(email: String!, password: String!, firstName: String!, lastName: String!): BazaarTokens!
 	updateCustomer(update: [CustomerUpdate!]!): Customer!
 	addItemsToCart(newItems: [UpdateCartItem!]!): ShoppingCart!
@@ -60,22 +62,8 @@ type MutationRoot {
 }
 type BazaarTokens {
 	issuedAt: Int!
-	accessToken: String!
-	"""
-	Time until expiry (in seconds)
-	"""
 	accessTokenExpiresIn: Int!
-	"""
-	This token is automatically set in the cookies
-	"""
-	refreshToken: String!
-	"""
-	Time until expiry (in seconds)
-	"""
 	refreshTokenExpiresIn: Int!
-	"""
-	Will always be `bearer`
-	"""
 	tokenType: String!
 }
 input CustomerUpdate {

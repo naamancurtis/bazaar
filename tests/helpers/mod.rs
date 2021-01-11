@@ -6,7 +6,6 @@ mod env_vars;
 mod graphql;
 mod math;
 mod reqwest;
-mod tokens;
 mod types;
 
 pub use self::reqwest::*;
@@ -16,7 +15,6 @@ pub use database::*;
 pub use env_vars::set_env_vars_for_tests;
 pub use graphql::parse_graphql_response;
 pub use math::assert_on_decimal;
-pub use tokens::*;
 pub use types::*;
 
 use lazy_static::lazy_static;
@@ -35,7 +33,7 @@ lazy_static! {
         let filter = if std::env::var("TEST_LOG").is_ok() {
             "debug"
         } else {
-            ""
+            "100"
         };
         let subscriber = generate_subscriber("test".to_string(), filter.into());
         init_subscriber(subscriber);

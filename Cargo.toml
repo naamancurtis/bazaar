@@ -17,13 +17,18 @@ path = "src/generate_schema.rs"
 name = "schema"
 
 [dependencies]
+# Version required due to dependencies for other libraries
 tokio = { version = "0.2.6", features = ["full"] }
-futures = "0.3.8"
+futures = "0.3.9"
+async-trait = "0.1.42"
 
 actix-web = "3.3.0"
 actix-rt = "1.1.1"
-async-graphql = "2.1.5"
-async-graphql-actix-web = "2.1.5"
+actix-cors = "0.5.4"
+http = "0.2.3"
+
+async-graphql = "2.4.7" 
+async-graphql-actix-web = "2.4.6"
 
 serde = { version = "1.0.117", features = ["derive"] }
 serde_json = "1.0.59"
@@ -31,9 +36,8 @@ serde-aux = "1.1.0"
 chrono = { version = "0.4.19", features = ["serde"] }
 uuid = { version = "0.8.1", features = ["serde", "v4"] }
 
-sqlx = { version = "0.4.1", default-features = false, features = ["runtime-tokio-native-tls", "macros", "postgres", "uuid", "chrono", "migrate", "offline", "json"] }
+sqlx = { version = "0.4.2", default-features = false, features = ["runtime-tokio-native-tls", "macros", "postgres", "uuid", "chrono", "migrate", "offline", "json"] }
 
-anyhow = "1.0.34"
 config = { version = "0.10.1", default-features = false, features = ["yaml"] }
 
 tracing = "0.1.22"
@@ -47,10 +51,14 @@ strum = { version = "0.20.0", features = ["derive"] }
 rust-argon2 = "0.8.3"
 jsonwebtoken = "7.2.0"
 lazy_static = "1.4.0"
-async-trait = "0.1.42"
 thiserror = "1.0.22"
 
+# Need to force 1.6.1 as there's a vulnerability < 1.6.1
+smallvec = "1.6.1"
+
 [dev-dependencies]
-reqwest = { version = "0.10.9", features = ["json", "trust-dns", "cookies"] } 
+reqwest = { version = "0.10.10", features = ["json", "trust-dns", "cookies"] } 
 assert-json-diff = "1.1.0"
 claim = "0.4.0"
+regex = "1.4.2"
+anyhow = "1.0.34"

@@ -4,7 +4,7 @@ use serde::Serialize;
 use thiserror::Error;
 use tracing::error;
 
-#[derive(Debug, Error, PartialEq)]
+#[derive(Debug, Error, PartialEq, Clone)]
 pub enum BazaarError {
     #[error("Could not find resource")]
     NotFound,
@@ -32,6 +32,9 @@ pub enum BazaarError {
 
     #[error("Internal Server Error")]
     ServerError(String),
+
+    #[error("Internal Server Error")]
+    PoisonConcurrencyError(String),
 
     #[error("Unexpected error occurred")]
     UnexpectedError,
@@ -73,7 +76,7 @@ impl ErrorExtensions for BazaarError {
                 e.set("statusText", "SERVER_ERROR");
                 e.set("context", error.to_string());
             }
-            Self::UnexpectedError => {
+            Self::UnexpectedError | Self::PoisonConcurrencyError(_) => {
                 e.set("status", 500);
                 e.set("statusText", "SERVER_ERROR");
             }

@@ -6,9 +6,11 @@ mod helpers;
 use helpers::*;
 
 #[actix_rt::test]
-async fn query_customer_fails_for_anonymous_user() -> Result<()> {
+async fn query_customer_fails_for_an_unknown_user() -> Result<()> {
     let app = spawn_app().await;
-    let tokens = get_anonymous_token(&app.db_pool).await?;
+    let unauth_client = build_http_client()?;
+    let anon_client = build_http_client()?;
+    let _customer = get_anonymous_token(&anon_client, &app.address).await?;
 
     let graphql_mutatation = format!(
         r#"
@@ -24,27 +26,38 @@ async fn query_customer_fails_for_anonymous_user() -> Result<()> {
     let body = json!({
         "query": graphql_mutatation,
     });
-
-    let data = send_request(&app.address, Some(&tokens.tokens.access_token), body).await?;
-
-    let errors = data["errors"].clone();
-    assert_json_include!(
-        actual: errors,
-        expected: json!([{
+    let cases = vec![unauth_client, anon_client];
+    let expected = vec![
+        json!([{
+            "message": "Invalid token provided",
+            "extensions": {
+                "status": 401,
+                "statusText": "INVALID_TOKEN"
+            }
+        }]),
+        json!([{
             "message": "Anonymous users do not have access to this resource",
             "extensions": {
                 "status": 401,
                 "statusText": "UNAUTHORIZED"
             }
-        }])
-    );
+        }]),
+    ];
+    for (client, expected) in cases.into_iter().zip(expected.into_iter()) {
+        let response = send_request(&client, &app.address, &body).await?;
+
+        let errors = response.data["errors"].clone();
+        assert_json_include!(actual: errors, expected: &expected);
+    }
+
     Ok(())
 }
 
 #[actix_rt::test]
 async fn query_customer_works_for_known_user() -> Result<()> {
     let app = spawn_app().await;
-    let tokens = get_known_token(&app.db_pool).await?;
+    let client = build_http_client()?;
+    let customer = sign_user_up_and_get_known_token(&client, &app.address).await?;
 
     let graphql_mutatation = format!(
         r#"
@@ -61,15 +74,16 @@ async fn query_customer_works_for_known_user() -> Result<()> {
         "query": graphql_mutatation,
     });
 
-    let data = send_request(&app.address, Some(&tokens.tokens.access_token), body).await?;
-    let data = data["data"]["customer"].clone();
+    let response = send_request(&client, &app.address, &body).await?;
+    let data = response.data["data"]["customer"].clone();
+
     assert_json_include!(
         actual: data,
         expected: json!({
-            "id": tokens.customer.public_id.unwrap(),
-            "firstName": "Bruce",
-            "lastName": "Wayne",
-            "email": "imbatman@test.com",
+            "id": customer.public_id.unwrap(),
+            "firstName": customer.first_name.unwrap(),
+            "lastName": customer.last_name.unwrap(),
+            "email": customer.email.unwrap(),
         })
     );
     Ok(())
@@ -78,7 +92,8 @@ async fn query_customer_works_for_known_user() -> Result<()> {
 #[actix_rt::test]
 async fn query_customer_with_known_user_includes_cart() -> Result<()> {
     let app = spawn_app().await;
-    let tokens = get_known_token(&app.db_pool).await?;
+    let client = build_http_client()?;
+    let customer = sign_user_up_and_get_known_token(&client, &app.address).await?;
 
     let graphql_mutatation = format!(
         r#"
@@ -98,17 +113,17 @@ async fn query_customer_with_known_user_includes_cart() -> Result<()> {
         "query": graphql_mutatation,
     });
 
-    let data = send_request(&app.address, Some(&tokens.tokens.access_token), body).await?;
-    let data = data["data"]["customer"].clone();
+    let response = send_request(&client, &app.address, &body).await?;
+    let data = response.data["data"]["customer"].clone();
     assert_json_include!(
         actual: data,
         expected: json!({
-            "id": tokens.customer.public_id.unwrap(),
-            "firstName": "Bruce",
-            "lastName": "Wayne",
-            "email": "imbatman@test.com",
+            "id": customer.public_id.unwrap(),
+            "firstName": customer.first_name.unwrap(),
+            "lastName": customer.last_name.unwrap(),
+            "email": customer.email.unwrap(),
             "cart": {
-                "id": tokens.customer.cart_id,
+                "id": customer.cart_id.unwrap(),
                 "currency": "GBP",
                 "cartType": "KNOWN",
                 "priceBeforeDiscounts": 0.0,
@@ -123,7 +138,8 @@ async fn query_customer_with_known_user_includes_cart() -> Result<()> {
 #[actix_rt::test]
 async fn query_cart_works_for_anonymous_user() -> Result<()> {
     let app = spawn_app().await;
-    let tokens = get_anonymous_token(&app.db_pool).await?;
+    let client = build_http_client()?;
+    let customer = get_anonymous_token(&client, &app.address).await?;
 
     let graphql_mutatation = format!(
         r#"
@@ -140,13 +156,13 @@ async fn query_cart_works_for_anonymous_user() -> Result<()> {
         "query": graphql_mutatation,
     });
 
-    let data = send_request(&app.address, Some(&tokens.tokens.access_token), body).await?;
-    let data = data["data"]["cart"].clone();
+    let response = send_request(&client, &app.address, &body).await?;
+    let data = response.data["data"]["cart"].clone();
 
     assert_json_include!(
         actual: &data,
         expected: json!({
-            "id": tokens.cart_id,
+            "id": customer.cart_id.unwrap(),
             "currency": "GBP",
             "cartType": "ANONYMOUS",
             "priceBeforeDiscounts": 0.0,
@@ -161,7 +177,8 @@ async fn query_cart_works_for_anonymous_user() -> Result<()> {
 #[actix_rt::test]
 async fn query_cart_works_for_known_user() -> Result<()> {
     let app = spawn_app().await;
-    let tokens = get_known_token(&app.db_pool).await?;
+    let client = build_http_client()?;
+    let customer = sign_user_up_and_get_known_token(&client, &app.address).await?;
 
     let graphql_mutatation = format!(
         r#"
@@ -178,13 +195,13 @@ async fn query_cart_works_for_known_user() -> Result<()> {
         "query": graphql_mutatation,
     });
 
-    let data = send_request(&app.address, Some(&tokens.tokens.access_token), body).await?;
-    let data = data["data"]["cart"].clone();
+    let response = send_request(&client, &app.address, &body).await?;
+    let data = response.data["data"]["cart"].clone();
 
     assert_json_include!(
         actual: &data,
         expected: json!({
-            "id": tokens.customer.cart_id.unwrap(),
+            "id": customer.cart_id.unwrap(),
             "currency": "GBP",
             "cartType": "KNOWN",
             "priceBeforeDiscounts": 0.0,
@@ -192,6 +209,20 @@ async fn query_cart_works_for_known_user() -> Result<()> {
             "items": [],
         })
     );
+
+    Ok(())
+}
+
+#[actix_rt::test]
+async fn query_health_check_works() -> Result<()> {
+    let app = spawn_app().await;
+    let client = build_http_client()?;
+
+    let body = json!({ "query": "{ healthCheck }" });
+    let response = send_request(&client, &app.address, &body).await?;
+
+    let data = response.data["data"]["healthCheck"].clone();
+    assert_json_include!(actual: data, expected: true);
 
     Ok(())
 }

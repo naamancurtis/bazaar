@@ -3,7 +3,7 @@ use serde::Deserialize;
 use serde_aux::field_attributes::deserialize_number_from_string;
 use sqlx::postgres::{PgConnectOptions, PgSslMode};
 use std::convert::{TryFrom, TryInto};
-use std::env::var;
+use std::env::{set_var, var};
 use std::fmt;
 
 #[derive(Deserialize)]
@@ -45,7 +45,10 @@ pub fn get_configuration() -> Result<Configuration, config::ConfigError> {
     settings.merge(File::from(configuration_directory.join("base")).required(true))?;
 
     let environment: Environment = var("APP_ENVIRONMENT")
-        .unwrap_or_else(|_| "local".into())
+        .unwrap_or_else(|_| {
+            set_var("APP_ENVIRONMENT", "local");
+            "local".into()
+        })
         .try_into()
         .expect("failed to parse APP_ENVIRONMENT");
 
