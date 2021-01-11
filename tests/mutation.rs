@@ -536,7 +536,7 @@ async fn mutation_update_customer_without_known_token_errors() -> Result<()> {
             "extensions": {
                 "status": 401,
                 "statusText": "INVALID_TOKEN",
-                "details": "No token found"
+                "details": "No token was found"
             }
         }]),
         json!([{

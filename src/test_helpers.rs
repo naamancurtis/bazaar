@@ -6,7 +6,8 @@ use crate::{
     models::{Claims, CustomerType, TokenType},
 };
 
-pub fn create_valid_jwt_token(token_type: TokenType) -> (String, Claims) {
+/// Creates a valid JWT from the provided IDs
+pub fn create_valid_jwt_token(public_id: Uuid, cart_id: Uuid, token_type: TokenType) -> (String, Claims) {
     let iat = Utc::now();
     let exp = iat + Duration::minutes(15);
     let count = if token_type == TokenType::Access {
@@ -15,9 +16,9 @@ pub fn create_valid_jwt_token(token_type: TokenType) -> (String, Claims) {
         Some(0)
     };
     let claims = Claims {
-        sub: Some(Uuid::new_v4()),
+        sub: Some(public_id),
         customer_type: CustomerType::Known,
-        cart_id: Uuid::new_v4(),
+        cart_id,
         exp: exp.timestamp() as usize,
         iat: iat.timestamp() as usize,
         id: None,

@@ -10,7 +10,7 @@ use sqlx::PgPool;
 use std::net::TcpListener;
 use tracing_actix_web::TracingLogger;
 
-use crate::{routes::*, BazaarSchema, MutationRoot, QueryRoot};
+use crate::{routes::*, BazaarSchema, MutationRoot, QueryRoot, auth::REFRESH_TOKEN_DURATION_SECONDS};
 
 pub fn generate_schema(connection: Option<PgPool>) -> BazaarSchema {
     if let Some(connection) = connection {
@@ -30,7 +30,7 @@ pub fn build_app(listener: TcpListener, connection: PgPool) -> Result<Server, st
 
     let server = HttpServer::new(move || {
         App::new()
-            .wrap(TracingLogger)
+            // .wrap(TracingLogger)
             .wrap(
                 Cors::default()
                     .allowed_origin_fn(|origin, _req_head| {
@@ -39,11 +39,11 @@ pub fn build_app(listener: TcpListener, connection: PgPool) -> Result<Server, st
                     })
                     .allowed_methods(vec!["GET", "POST"])
                     .allowed_headers(&[ACCESS_CONTROL_ALLOW_CREDENTIALS, COOKIE])
-                    .max_age(3000000),
+                    .max_age(Some(REFRESH_TOKEN_DURATION_SECONDS as usize)), // @TODO - verify this is correct
             )
             .data(schema.clone())
             .data(connection.clone())
-            .service(web::resource("/").guard(guard::Post()).to(graphql_index))
+            .service(web::resource("/").wrap(TracingLogger).guard(guard::Post()).to(graphql_index))
             .service(
                 web::resource("/")
                     .guard(guard::Get())

@@ -51,20 +51,6 @@ impl BazaarCookies {
             .map_err(|e| BazaarError::PoisonConcurrencyError(e.to_string()))?
             .clone())
     }
-
-    /// The way the application is currently coded, if either the access
-    /// cookie or the refresh cookie are `Some` then it will automatically
-    /// update the cookie on the response.
-    ///
-    /// For most query/mutations, (other than auth related ones) we don't
-    /// want to modify the cookies in any way, so this state needs to be set to
-    /// `None` once the cookie has been verified and the customer should
-    /// have access to that resource
-    pub(crate) fn set_cookies_to_not_be_changed(&self) -> Result<()> {
-        self.set_refresh_cookie(None)?;
-        self.set_access_cookie(None)?;
-        Ok(())
-    }
 }
 
 #[cfg(test)]

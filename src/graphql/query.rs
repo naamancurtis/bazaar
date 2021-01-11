@@ -31,7 +31,7 @@ impl QueryRoot {
 
     #[tracing::instrument(skip(self, ctx))]
     async fn customer<'ctx>(&self, ctx: &'ctx Context<'_>) -> Result<Customer> {
-        let mut context = extract_token_and_database_pool(ctx, true, false)
+        let context = extract_token_and_database_pool(ctx, true, false)
             .await
             .map_err(|e| e.extend())?;
         let token = context.access_token().map_err(|e| e.extend())?;
@@ -57,7 +57,7 @@ impl QueryRoot {
 
     #[tracing::instrument(skip(self, ctx))]
     async fn cart(&self, ctx: &Context<'_>) -> Result<ShoppingCart> {
-        let mut context = extract_token_and_database_pool(ctx, true, false)
+        let context = extract_token_and_database_pool(ctx, true, false)
             .await
             .map_err(|e| e.extend())?;
         let token = context.access_token().map_err(|e| e.extend())?;

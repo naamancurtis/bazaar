@@ -8,7 +8,10 @@ use uuid::Uuid;
 use crate::{
     auth::{generate_new_tokens, refresh_tokens, verify_password_and_fetch_details},
     database::{AuthDatabase, CartItemDatabase, CustomerDatabase, ShoppingCartDatabase},
-    graphql::{extract_token_and_database_pool, validators::ValidCustomerUpdateType},
+    graphql::{
+        extract_token_and_database_pool, set_auth_cookies_on_response,
+        validators::ValidCustomerUpdateType,
+    },
     models::{
         cart_item::{InternalCartItem, UpdateCartItem},
         BazaarTokens, Currency, Customer, CustomerType, CustomerUpdate, ShoppingCart,
@@ -27,7 +30,7 @@ impl MutationRoot {
         email: String,
         password: String,
     ) -> Result<BazaarTokens> {
-        let mut context = extract_token_and_database_pool(ctx, true, false)
+        let context = extract_token_and_database_pool(ctx, true, false)
             .await
             .map_err(|e| e.extend())?;
         let pool = context.pool;
@@ -78,10 +81,10 @@ impl MutationRoot {
         .map_err(|e| e.extend())?;
 
         // @TODO - Refactor all this to avoid the cloning
-        context.set_new_cookies(
-            Some(tokens.access_token.clone()),
-            Some(tokens.refresh_token.clone()),
-        )?;
+        set_auth_cookies_on_response(
+            ctx,
+            &tokens
+        );
         Ok(tokens)
     }
 
@@ -91,7 +94,7 @@ impl MutationRoot {
         // and both have expired. However when they access the site after that
         // time period the client they're using hasn't cleared the tokens and
         // expired tokens are sent. In this case we do want to log them in again.
-        let mut context = extract_token_and_database_pool(ctx, true, false)
+        let context = extract_token_and_database_pool(ctx, true, false)
             .await
             .map_err(|e| e.extend())?;
         let token = context.access_token();
@@ -107,16 +110,16 @@ impl MutationRoot {
             .map_err(|e| e.extend())?;
 
         // @TODO - Refactor all this to avoid the cloning
-        context.set_new_cookies(
-            Some(tokens.access_token.clone()),
-            Some(tokens.refresh_token.clone()),
-        )?;
+        set_auth_cookies_on_response(
+            ctx,
+            &tokens
+        );
         Ok(tokens)
     }
 
     #[tracing::instrument(skip(self, ctx))]
     async fn refresh(&self, ctx: &Context<'_>) -> Result<BazaarTokens> {
-        let mut context = extract_token_and_database_pool(ctx, true, true)
+        let context = extract_token_and_database_pool(ctx, true, true)
             .await
             .map_err(|e| e.extend())?;
         let refresh_token = context.refresh_token()?;
@@ -133,10 +136,10 @@ impl MutationRoot {
         .await?;
 
         // @TODO - Refactor all this to avoid the cloning
-        context.set_new_cookies(
-            Some(tokens.access_token.clone()),
-            Some(tokens.refresh_token.clone()),
-        )?;
+        set_auth_cookies_on_response(
+            ctx,
+            &tokens
+        );
 
         Ok(tokens)
     }
@@ -150,7 +153,7 @@ impl MutationRoot {
         #[graphql(validator(StringMinLength(length = "2")))] first_name: String,
         #[graphql(validator(StringMinLength(length = "2")))] last_name: String,
     ) -> Result<BazaarTokens> {
-        let mut context = extract_token_and_database_pool(ctx, true, false)
+        let context = extract_token_and_database_pool(ctx, true, false)
             .await
             .map_err(|e| e.extend())?;
         let token = context.access_token();
@@ -196,10 +199,10 @@ impl MutationRoot {
         .await
         .map_err(|e| e.extend())?;
         // @TODO - Refactor all this to avoid the cloning
-        context.set_new_cookies(
-            Some(tokens.access_token.clone()),
-            Some(tokens.refresh_token.clone()),
-        )?;
+        set_auth_cookies_on_response(
+            ctx,
+            &tokens
+        );
         Ok(tokens)
     }
 
@@ -209,7 +212,7 @@ impl MutationRoot {
         ctx: &Context<'_>,
         #[graphql(validator(ValidCustomerUpdateType))] update: Vec<CustomerUpdate>,
     ) -> Result<Customer> {
-        let mut context = extract_token_and_database_pool(ctx, true, false)
+        let context = extract_token_and_database_pool(ctx, true, false)
             .await
             .map_err(|e| e.extend())?;
         let token = context.access_token().map_err(|e| e.extend())?;
@@ -231,7 +234,7 @@ impl MutationRoot {
         ctx: &Context<'_>,
         new_items: Vec<UpdateCartItem>,
     ) -> Result<ShoppingCart> {
-        let mut context = extract_token_and_database_pool(ctx, true, false)
+        let context = extract_token_and_database_pool(ctx, true, false)
             .await
             .map_err(|e| e.extend())?;
         let token = context.access_token().map_err(|e| e.extend())?;
@@ -254,7 +257,7 @@ impl MutationRoot {
         ctx: &Context<'_>,
         removed_items: Vec<UpdateCartItem>,
     ) -> Result<ShoppingCart> {
-        let mut context = extract_token_and_database_pool(ctx, true, false)
+        let context = extract_token_and_database_pool(ctx, true, false)
             .await
             .map_err(|e| e.extend())?;
         let token = context.access_token().map_err(|e| e.extend())?;
