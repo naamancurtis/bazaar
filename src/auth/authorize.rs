@@ -191,7 +191,8 @@ mod tests {
     #[test]
     fn decode_valid_token() {
         set_token_env_vars_for_tests();
-        let (token, claims) = create_valid_jwt_token(Uuid::new_v4(), Uuid::new_v4(), TokenType::Access);
+        let (token, claims) =
+            create_valid_jwt_token(Uuid::new_v4(), Uuid::new_v4(), TokenType::Access);
         let decoded_token = decode_token(&token, TokenType::Access);
         assert_ok!(&decoded_token);
         let decoded_token = decoded_token.unwrap();
@@ -214,7 +215,8 @@ mod tests {
     #[tokio::test]
     async fn correctly_parses_valid_token() {
         set_token_env_vars_for_tests();
-        let (token, claims) = create_valid_jwt_token(Uuid::new_v4(), Uuid::new_v4(), TokenType::Access);
+        let (token, claims) =
+            create_valid_jwt_token(Uuid::new_v4(), Uuid::new_v4(), TokenType::Access);
         let config = crate::get_configuration().expect("failed to read config");
         let pool = PgPool::connect_lazy(&config.database.raw_pg_url())
             .expect("failed to create fake connection");

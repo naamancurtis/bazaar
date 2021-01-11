@@ -8,11 +8,11 @@ use tracing::error;
 use crate::{
     auth::verify_and_deserialize_token,
     database::AuthDatabase,
-    models::{BazaarCookies, BazaarToken, TokenType, BazaarTokens},
+    models::{BazaarCookies, BazaarToken, BazaarTokens, TokenType},
     BazaarError, Result,
 };
 
-/// An internal struct that holds state that is pulled off the 
+/// An internal struct that holds state that is pulled off the
 /// GraphQL context for most requests
 pub struct GraphqlContext<'a> {
     pub pool: &'a PgPool,
@@ -102,21 +102,24 @@ pub fn extract_database_pool<'a>(context: &'a Context<'_>) -> Result<&'a PgPool>
 }
 
 #[tracing::instrument(skip(ctx, tokens))]
-pub fn set_auth_cookies_on_response(
-    ctx: &Context<'_>,
-    tokens: &BazaarTokens,
-) {
-    if let Some(access) = generate_auth_cookie_string(&tokens.access_token, TokenType::Access, tokens.access_token_expires_in) {
-        ctx.append_http_header(SET_COOKIE, access);
-    }
-    if let Some(refresh) = generate_auth_cookie_string(&tokens.refresh_token, TokenType::Refresh(0), tokens.refresh_token_expires_in){
-        ctx.append_http_header(SET_COOKIE, refresh);
-    }
+pub fn set_auth_cookies_on_response(ctx: &Context<'_>, tokens: &BazaarTokens) {
+    let access = generate_auth_cookie_string(
+        &tokens.access_token,
+        TokenType::Access,
+        tokens.access_token_expires_in,
+    );
+    ctx.append_http_header(SET_COOKIE, access);
+    let refresh = generate_auth_cookie_string(
+        &tokens.refresh_token,
+        TokenType::Refresh(0),
+        tokens.refresh_token_expires_in,
+    );
+    ctx.append_http_header(SET_COOKIE, refresh);
 }
 
 /// As cookies are set via the `Set-Cookie` header, this helper function generates the string that
 /// is expected as the value
-fn generate_auth_cookie_string(cookie: &str, token_type: TokenType, expiry: i64) -> Option<String> {
+fn generate_auth_cookie_string(cookie: &str, token_type: TokenType, expiry: i64) -> String {
     // This is hacky, and ideally we'd be able to get rid of it, but with `Secure` set on the
     // cookies, and no TLS cert on the server, none of the cookies get set within the tests.
     // Ideally we'd push all the traffic to https even on tests
@@ -129,11 +132,11 @@ fn generate_auth_cookie_string(cookie: &str, token_type: TokenType, expiry: i64)
     } else {
         "Secure; "
     };
-    Some(format!(
+    format!(
         "{}={}; {}HttpOnly; MaxAge={}",
         token_type.as_str(),
         cookie,
         secure,
         expiry
-    ))
+    )
 }

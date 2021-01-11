@@ -7,7 +7,11 @@ use crate::{
 };
 
 /// Creates a valid JWT from the provided IDs
-pub fn create_valid_jwt_token(public_id: Uuid, cart_id: Uuid, token_type: TokenType) -> (String, Claims) {
+pub fn create_valid_jwt_token(
+    public_id: Uuid,
+    cart_id: Uuid,
+    token_type: TokenType,
+) -> (String, Claims) {
     let iat = Utc::now();
     let exp = iat + Duration::minutes(15);
     let count = if token_type == TokenType::Access {

@@ -81,10 +81,7 @@ impl MutationRoot {
         .map_err(|e| e.extend())?;
 
         // @TODO - Refactor all this to avoid the cloning
-        set_auth_cookies_on_response(
-            ctx,
-            &tokens
-        );
+        set_auth_cookies_on_response(ctx, &tokens);
         Ok(tokens)
     }
 
@@ -110,10 +107,7 @@ impl MutationRoot {
             .map_err(|e| e.extend())?;
 
         // @TODO - Refactor all this to avoid the cloning
-        set_auth_cookies_on_response(
-            ctx,
-            &tokens
-        );
+        set_auth_cookies_on_response(ctx, &tokens);
         Ok(tokens)
     }
 
@@ -136,10 +130,7 @@ impl MutationRoot {
         .await?;
 
         // @TODO - Refactor all this to avoid the cloning
-        set_auth_cookies_on_response(
-            ctx,
-            &tokens
-        );
+        set_auth_cookies_on_response(ctx, &tokens);
 
         Ok(tokens)
     }
@@ -199,10 +190,7 @@ impl MutationRoot {
         .await
         .map_err(|e| e.extend())?;
         // @TODO - Refactor all this to avoid the cloning
-        set_auth_cookies_on_response(
-            ctx,
-            &tokens
-        );
+        set_auth_cookies_on_response(ctx, &tokens);
         Ok(tokens)
     }
 
