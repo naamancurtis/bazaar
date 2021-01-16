@@ -73,7 +73,7 @@ async fn mutation_sign_up_without_token_works() -> Result<()> {
 async fn mutation_sign_up_with_anonymous_token_works() -> Result<()> {
     let app = spawn_app().await;
     let client = build_http_client()?;
-    let customer = get_anonymous_token(&client, &app.address).await?;
+    let anon_customer = get_anonymous_token(&client, &app.address).await?;
 
     let graphql_mutatation = format!(
         r#"
@@ -119,7 +119,7 @@ async fn mutation_sign_up_with_anonymous_token_works() -> Result<()> {
     // The private ID should not be exposed publically
     assert_ne!(access_claims.sub, Some(new_customer.id));
     // The cart should have been promoted, so they both should be the same
-    assert_eq!(access_claims.cart_id, customer.cart_id.unwrap());
+    assert_eq!(access_claims.cart_id, anon_customer.cart_id.unwrap());
 
     Ok(())
 }

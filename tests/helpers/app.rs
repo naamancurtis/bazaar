@@ -1,5 +1,6 @@
 use sqlx::PgPool;
 use std::net::TcpListener;
+use std::sync::Arc;
 use uuid::Uuid;
 
 use crate::helpers::{configure_database, set_env_vars_for_tests, TRACING};
@@ -28,7 +29,8 @@ pub async fn spawn_app() -> TestApp {
 
     let pool = configure_database(&configuration.database).await;
 
-    let server = bazaar::build_app(listener, pool.clone()).expect("failed to bind address");
+    let server = bazaar::build_app(listener, pool.clone(), Arc::new(configuration))
+        .expect("failed to bind address");
 
     let _ = tokio::spawn(server);
     TestApp {

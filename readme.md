@@ -6,7 +6,7 @@
 
 Bazaar is a fully async GraphQL Server written in Rust using `Actix Web`,
 `Async-GraphQL` and `SQLx`. It implements the basic functionality you would
-expect to find on an **e-commerce platform** [(see below for more details)](https://github.com/naamancurtis/bazaar/blob/main/functionality.md).
+expect to find on an **e-commerce platform** [(see functionality.md for more information)](https://github.com/naamancurtis/bazaar/blob/main/functionality.md).
 
 It's my hope that this project will be a useful example for others to see how to compose a production ready Rust
 application from some of the awesome crates in the ecosystem, along with how various

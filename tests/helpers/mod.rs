@@ -35,8 +35,10 @@ lazy_static! {
         } else {
             "100"
         };
-        let subscriber = generate_subscriber("test".to_string(), filter.into());
+        let (tracer, _uninstall) = opentelemetry_otlp::new_pipeline().install().expect("failed to create tracer");
+        let subscriber = generate_subscriber("test", filter.into(), tracer);
         init_subscriber(subscriber);
+        // drop(_uninstall)
     };
 
     pub static ref DEFAULT_CUSTOMER: serde_json::Value = {

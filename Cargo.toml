@@ -47,6 +47,12 @@ tracing-log = "0.1.1"
 tracing-bunyan-formatter = "0.1.7"
 tracing-actix-web = "0.2.1"
 
+opentelemetry = { version = "0.11.2", features = ["metrics", "tokio", "tonic"] } 
+tracing-opentelemetry = "0.10.0"
+actix-web-opentelemetry = { version = "0.9.0", features = ["metrics"] }
+opentelemetry-otlp = { version = "0.4.0", features = ["tokio", "tonic"] }
+opentelemetry-semantic-conventions = "0.3.0"
+
 strum = { version = "0.20.0", features = ["derive"] } 
 rust-argon2 = "0.8.3"
 jsonwebtoken = "7.2.0"

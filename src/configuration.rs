@@ -10,6 +10,8 @@ use std::fmt;
 pub struct Configuration {
     pub database: DatabaseSettings,
     pub application: ApplicationSettings,
+    telemetry: TelemetrySettings,
+    pub env: Environment,
 }
 
 #[derive(Deserialize)]
@@ -30,9 +32,18 @@ pub struct DatabaseSettings {
     pub require_ssl: bool,
 }
 
-#[derive(Debug)]
+#[derive(Deserialize)]
+pub struct TelemetrySettings {
+    #[serde(deserialize_with = "deserialize_number_from_string")]
+    port: u16,
+    host: String,
+}
+
+#[derive(Debug, Deserialize, Copy, Clone)]
+#[serde(rename_all = "lowercase")]
 pub enum Environment {
     Local,
+    Test,
     CI,
     Production,
 }
@@ -44,13 +55,13 @@ pub fn get_configuration() -> Result<Configuration, config::ConfigError> {
 
     settings.merge(File::from(configuration_directory.join("base")).required(true))?;
 
-    let environment: Environment = var("APP_ENVIRONMENT")
+    let environment: Environment = var("APP_ENV")
         .unwrap_or_else(|_| {
-            set_var("APP_ENVIRONMENT", "local");
+            set_var("APP_ENV", "local");
             "local".into()
         })
         .try_into()
-        .expect("failed to parse APP_ENVIRONMENT");
+        .expect("failed to parse APP_ENV");
 
     settings
         .merge(File::from(configuration_directory.join(environment.as_str())).required(true))?;
@@ -67,6 +78,10 @@ impl Configuration {
 
     pub fn get_addr(&self) -> String {
         format!("{}:{}", self.application.host, self.application.port)
+    }
+
+    pub fn get_telemetry_agent_endpoint(&self) -> String {
+        format!("https://{}:{}", self.telemetry.host, self.telemetry.port)
     }
 }
 
@@ -102,6 +117,7 @@ impl Environment {
     pub fn as_str(&self) -> &'static str {
         match self {
             Environment::Local => "local",
+            Environment::Test => "test",
             Environment::CI => "ci",
             Environment::Production => "production",
         }
@@ -112,6 +128,7 @@ impl fmt::Display for Environment {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         let string = match self {
             Environment::Local => "local",
+            Environment::Test => "test",
             Environment::CI => "ci",
             Environment::Production => "production",
         };
@@ -125,6 +142,7 @@ impl TryFrom<String> for Environment {
     fn try_from(s: String) -> Result<Self, Self::Error> {
         match s.to_lowercase().as_str() {
             "local" => Ok(Self::Local),
+            "test" => Ok(Self::Test),
             "ci" => Ok(Self::CI),
             "production" => Ok(Self::Production),
             other => Err(format!("{} is not a supported environment", other)),

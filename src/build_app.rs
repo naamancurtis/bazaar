@@ -5,34 +5,40 @@ use actix_web::{
     http::header::{ACCESS_CONTROL_ALLOW_CREDENTIALS, COOKIE},
     web, App, HttpServer,
 };
+use actix_web_opentelemetry::RequestTracing;
 use async_graphql::{extensions::ApolloTracing, EmptySubscription, Schema};
 use sqlx::PgPool;
 use std::net::TcpListener;
 use tracing_actix_web::TracingLogger;
 
 use crate::{
-    auth::REFRESH_TOKEN_DURATION_SECONDS, routes::*, BazaarSchema, MutationRoot, QueryRoot,
+    auth::REFRESH_TOKEN_DURATION_SECONDS, routes::*, AppConfig, BazaarSchema, MutationRoot,
+    QueryRoot,
 };
 
-pub fn generate_schema(connection: Option<PgPool>) -> BazaarSchema {
+pub fn generate_schema(connection: Option<PgPool>, config: Option<AppConfig>) -> BazaarSchema {
+    let mut schema =
+        Schema::build(QueryRoot, MutationRoot, EmptySubscription).extension(ApolloTracing);
     if let Some(connection) = connection {
-        Schema::build(QueryRoot, MutationRoot, EmptySubscription)
-            .extension(ApolloTracing)
-            .data(connection)
-            .finish()
-    } else {
-        Schema::build(QueryRoot, MutationRoot, EmptySubscription)
-            .extension(ApolloTracing)
-            .finish()
+        schema = schema.data(connection);
     }
+    if let Some(config) = config {
+        schema = schema.data(config);
+    }
+    schema.finish()
 }
 
-pub fn build_app(listener: TcpListener, connection: PgPool) -> Result<Server, std::io::Error> {
-    let schema = generate_schema(Some(connection.clone()));
+pub fn build_app(
+    listener: TcpListener,
+    connection: PgPool,
+    configuration: AppConfig,
+) -> Result<Server, Box<dyn std::error::Error + Send + Sync>> {
+    let schema = generate_schema(Some(connection.clone()), Some(configuration));
 
     let server = HttpServer::new(move || {
         App::new()
             .wrap(TracingLogger)
+            .wrap(RequestTracing::new())
             .wrap(
                 Cors::default()
                     .allowed_origin_fn(|origin, _req_head| {

@@ -1,7 +1,6 @@
 use async_graphql::Context;
 use http::header::SET_COOKIE;
 use sqlx::PgPool;
-use std::env::var;
 use std::sync::Arc;
 use tracing::error;
 
@@ -9,7 +8,7 @@ use crate::{
     auth::verify_and_deserialize_token,
     database::AuthDatabase,
     models::{BazaarCookies, BazaarToken, BazaarTokens, TokenType},
-    BazaarError, Result,
+    AppConfig, BazaarError, Environment, Result,
 };
 
 /// An internal struct that holds state that is pulled off the
@@ -103,34 +102,40 @@ pub fn extract_database_pool<'a>(context: &'a Context<'_>) -> Result<&'a PgPool>
 
 #[tracing::instrument(skip(ctx, tokens))]
 pub fn set_auth_cookies_on_response(ctx: &Context<'_>, tokens: &BazaarTokens) {
+    let app_env = ctx
+        .data::<AppConfig>()
+        .expect("configuration should always be present in context")
+        .env;
     let access = generate_auth_cookie_string(
         &tokens.access_token,
         TokenType::Access,
         tokens.access_token_expires_in,
+        app_env,
     );
     ctx.append_http_header(SET_COOKIE, access);
     let refresh = generate_auth_cookie_string(
         &tokens.refresh_token,
         TokenType::Refresh(0),
         tokens.refresh_token_expires_in,
+        app_env,
     );
     ctx.append_http_header(SET_COOKIE, refresh);
 }
 
 /// As cookies are set via the `Set-Cookie` header, this helper function generates the string that
 /// is expected as the value
-fn generate_auth_cookie_string(cookie: &str, token_type: TokenType, expiry: i64) -> String {
+fn generate_auth_cookie_string(
+    cookie: &str,
+    token_type: TokenType,
+    expiry: i64,
+    env: Environment,
+) -> String {
     // This is hacky, and ideally we'd be able to get rid of it, but with `Secure` set on the
     // cookies, and no TLS cert on the server, none of the cookies get set within the tests.
     // Ideally we'd push all the traffic to https even on tests
-    let secure = if let Ok(env) = var("APP_ENVIRONMENT") {
-        if env == "local" {
-            ""
-        } else {
-            "Secure; "
-        }
-    } else {
-        "Secure; "
+    let secure = match env {
+        Environment::Local | Environment::Test => "",
+        _ => "Secure; ",
     };
     format!(
         "{}={}; {}HttpOnly; MaxAge={}",
