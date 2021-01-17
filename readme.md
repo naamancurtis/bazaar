@@ -20,6 +20,15 @@ I'm still very much learning, so if you spot any issues or have any improvements
 or feedback on anything within the app, please feel free to drop me a message or
 raise an issue on the repo.
 
+### Tech Stack
+
+See below for a diagram of the architecture as it currently looks. In reality
+you most probably wouldn't have all of the telemetry backends that are present,
+however I just wanted to have a go at integrating and playing around with them
+in this project, so I've left the connections in.
+
+![architecture](architecture.png)
+
 #### Out of Scope - _at least for now_
 
 - Stock & Stock Management - Will be included via some stub functionality
@@ -27,9 +36,13 @@ raise an issue on the repo.
 
 ## Running the App
 
-The app requires a running instance of PostGres, the easiest way to set this up
+The app requires a running instance of Postgres, the easiest way to set this up
 is to run the `./scripts/init_db.sh` script, which will pull down the latest
 docker postgres image, start it up, and run the migrations.
+
+If you want the full stack, including the telemetry collector and telemetry backends, it's
+best to use the `docker-compose` file (which includes postgres, so skip the step
+above), start up the docker-compose file, migrate the database manually with `SKIP_DOCKER=true ./scripts/init_db.sh` and then run the application (either in Docker or locally).
 
 ### Docker
 
