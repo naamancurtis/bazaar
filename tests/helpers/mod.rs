@@ -18,10 +18,9 @@ pub use math::assert_on_decimal;
 pub use types::*;
 
 use lazy_static::lazy_static;
-use serde_json::json;
-use uuid::Uuid;
-
-use bazaar::telemetry::{generate_subscriber, init_subscriber};
+use tracing::subscriber::set_global_default;
+use tracing_log::LogTracer;
+use tracing_subscriber::{layer::SubscriberExt, EnvFilter, Registry};
 
 lazy_static! {
     /// To ensure logs are only outputted in tests when required, by default
@@ -35,17 +34,11 @@ lazy_static! {
         } else {
             "100"
         };
-        let (tracer, _uninstall) = opentelemetry_otlp::new_pipeline().install().expect("failed to create tracer");
-        let subscriber = generate_subscriber("test", filter.into(), tracer);
-        init_subscriber(subscriber);
-        // drop(_uninstall)
-    };
-
-    pub static ref DEFAULT_CUSTOMER: serde_json::Value = {
-        json!({
-            "email": format!("{}@test.com", Uuid::nil()),
-            "firstName": Uuid::nil(),
-            "lastName": Uuid::nil()
-        })
+    let env_filter =
+        EnvFilter::try_from_default_env().unwrap_or_else(|_| EnvFilter::new(filter));
+    LogTracer::init().expect("failed to attach logs to tracing");
+    let registry = Registry::default()
+        .with(env_filter);
+        set_global_default(registry).unwrap();
     };
 }

@@ -336,9 +336,7 @@ dependencies = [
  "actix-web",
  "futures",
  "opentelemetry",
- "opentelemetry-prometheus",
  "opentelemetry-semantic-conventions",
- "prometheus",
  "serde",
 ]
 
@@ -445,9 +443,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql"
-version = "2.4.7"
+version = "2.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "46a20530b1e9f3a4a33ba6a78384a18d1505a91515cf1d5aa2d94b463ffb851f"
+checksum = "bc917718d313d26782de5e538731700914d3c4eb99b13bb89ef9d8a3bbbc9d3f"
 dependencies = [
  "async-graphql-derive",
  "async-graphql-parser",
@@ -502,9 +500,9 @@ dependencies = [
 
 [[package]]
 name = "async-graphql-derive"
-version = "2.4.6"
+version = "2.4.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a75763cc369e523724e703a6077d9a913f4bd74741ec8d0f08ad1a3c6a11cd91"
+checksum = "bbdda3212f54a78f3785a4c26f45994aaa2fc3ea54ce18a89123ffd851fe449c"
 dependencies = [
  "Inflector",
  "async-graphql-parser",
@@ -687,6 +685,7 @@ dependencies = [
  "assert-json-diff",
  "async-graphql",
  "async-graphql-actix-web",
+ "async-graphql-parser",
  "async-trait",
  "chrono",
  "claim",
@@ -698,6 +697,7 @@ dependencies = [
  "opentelemetry",
  "opentelemetry-otlp",
  "opentelemetry-semantic-conventions",
+ "prometheus",
  "regex",
  "reqwest",
  "rust-argon2",
@@ -710,7 +710,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
- "tracing-actix-web",
  "tracing-bunyan-formatter",
  "tracing-futures",
  "tracing-log",
@@ -2225,7 +2224,6 @@ dependencies = [
  "regex",
  "thiserror",
  "tokio",
- "tonic",
 ]
 
 [[package]]
@@ -2242,17 +2240,6 @@ dependencies = [
  "tokio",
  "tonic",
  "tonic-build",
-]
-
-[[package]]
-name = "opentelemetry-prometheus"
-version = "0.4.0"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "fd914010c0544ec101b0146ca89eb25b6f95510df120d44dd10b9b0f0dce5c35"
-dependencies = [
- "opentelemetry",
- "prometheus",
- "protobuf",
 ]
 
 [[package]]
@@ -2501,11 +2488,11 @@ dependencies = [
 
 [[package]]
 name = "prometheus"
-version = "0.10.0"
+version = "0.11.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "30d70cf4412832bcac9cffe27906f4a66e450d323525e977168c70d1b36120ae"
+checksum = "c8425533e7122f0c3cc7a37e6244b16ad3a2cc32ae7ac6276e2a75da0d9c200d"
 dependencies = [
- "cfg-if 0.1.10",
+ "cfg-if 1.0.0",
  "fnv",
  "lazy_static",
  "parking_lot",
@@ -3698,19 +3685,6 @@ dependencies = [
  "pin-project-lite 0.2.0",
  "tracing-attributes",
  "tracing-core",
-]
-
-[[package]]
-name = "tracing-actix-web"
-version = "0.2.1"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cc36fc2f840643e49d220d07cd7ca81bc31c7f6df25f164d4257971533dab354"
-dependencies = [
- "actix-web",
- "futures",
- "tracing",
- "tracing-futures",
- "uuid",
 ]
 
 [[package]]

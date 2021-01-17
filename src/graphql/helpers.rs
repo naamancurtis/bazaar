@@ -138,7 +138,7 @@ fn generate_auth_cookie_string(
         _ => "Secure; ",
     };
     format!(
-        "{}={}; {}HttpOnly; MaxAge={}",
+        "{}={}; {}HttpOnly; Max-Age={}",
         token_type.as_str(),
         cookie,
         secure,

@@ -60,7 +60,6 @@ pub async fn verify_and_deserialize_token<DB: AuthRepository>(
         return Err(BazaarError::InvalidToken("No token was found".to_owned()));
     }
     let mut token_data = decode_token(token, token_type)?;
-    tracing::warn!(?token_data);
     let id = DB::map_id(token_data.claims.sub, pool).await?;
     token_data.claims.id = id;
     Ok(BazaarToken::from(token_data))

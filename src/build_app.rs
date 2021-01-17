@@ -6,19 +6,18 @@ use actix_web::{
     web, App, HttpServer,
 };
 use actix_web_opentelemetry::RequestTracing;
-use async_graphql::{extensions::ApolloTracing, EmptySubscription, Schema};
+use async_graphql::{EmptySubscription, Schema};
 use sqlx::PgPool;
 use std::net::TcpListener;
-use tracing_actix_web::TracingLogger;
 
 use crate::{
-    auth::REFRESH_TOKEN_DURATION_SECONDS, routes::*, AppConfig, BazaarSchema, MutationRoot,
-    QueryRoot,
+    auth::REFRESH_TOKEN_DURATION_SECONDS, graphql::OpenTelemetryExtension, routes::*, AppConfig,
+    BazaarSchema, MutationRoot, QueryRoot,
 };
 
 pub fn generate_schema(connection: Option<PgPool>, config: Option<AppConfig>) -> BazaarSchema {
     let mut schema =
-        Schema::build(QueryRoot, MutationRoot, EmptySubscription).extension(ApolloTracing);
+        Schema::build(QueryRoot, MutationRoot, EmptySubscription).extension(OpenTelemetryExtension);
     if let Some(connection) = connection {
         schema = schema.data(connection);
     }
@@ -33,11 +32,10 @@ pub fn build_app(
     connection: PgPool,
     configuration: AppConfig,
 ) -> Result<Server, Box<dyn std::error::Error + Send + Sync>> {
-    let schema = generate_schema(Some(connection.clone()), Some(configuration));
+    let schema = generate_schema(Some(connection.clone()), Some(configuration.clone()));
 
     let server = HttpServer::new(move || {
         App::new()
-            .wrap(TracingLogger)
             .wrap(RequestTracing::new())
             .wrap(
                 Cors::default()
@@ -51,6 +49,7 @@ pub fn build_app(
             )
             .data(schema.clone())
             .data(connection.clone())
+            .data(configuration.clone())
             .service(web::resource("/").guard(guard::Post()).to(graphql_index))
             .service(
                 web::resource("/")

@@ -7,7 +7,6 @@ mod error;
 mod graphql;
 pub mod models;
 pub mod routes;
-pub mod telemetry;
 
 pub use build_app::{build_app, generate_schema};
 pub use configuration::{get_configuration, Environment};

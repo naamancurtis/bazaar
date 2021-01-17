@@ -49,17 +49,17 @@ pub struct NewCustomer {
 }
 
 impl Customer {
-    #[tracing::instrument(skip(pool), fields(model = "Customer"))]
+    #[tracing::instrument(skip(pool))]
     pub async fn find_all<DB: CustomerRepository>(pool: &PgPool) -> Result<Vec<Self>> {
         DB::find_all(pool).await
     }
 
-    #[tracing::instrument(skip(pool), fields(model = "Customer"))]
+    #[tracing::instrument(skip(pool))]
     pub async fn find_by_id<DB: CustomerRepository>(id: Uuid, pool: &PgPool) -> Result<Self> {
         DB::find_by_id(id, pool).await
     }
 
-    #[tracing::instrument(skip(pool), fields(model = "Customer"))]
+    #[tracing::instrument(skip(pool, email))]
     pub async fn find_by_email<DB: CustomerRepository>(
         email: String,
         pool: &PgPool,
@@ -69,8 +69,7 @@ impl Customer {
 
     #[tracing::instrument(
         name = "new_customer",
-        skip(pool, email, password, first_name, last_name),
-        fields(model = "Customer")
+        skip(pool, email, password, first_name, last_name)
     )]
     pub async fn new<DB: CustomerRepository>(
         id: Uuid,
@@ -107,7 +106,7 @@ impl Customer {
         })
     }
 
-    #[tracing::instrument(skip(pool), fields(model = "Customer"))]
+    #[tracing::instrument(skip(pool, update))]
     pub async fn update<DB: CustomerRepository>(
         id: Uuid,
         update: Vec<CustomerUpdate>,
@@ -117,7 +116,7 @@ impl Customer {
         DB::find_by_id(id, pool).await
     }
 
-    #[tracing::instrument(skip(pool), fields(model = "Customer"))]
+    #[tracing::instrument(skip(pool))]
     pub async fn add_new_cart<C: CustomerRepository, SC: ShoppingCartRepository>(
         id: Uuid,
         currency: Currency,
@@ -130,7 +129,7 @@ impl Customer {
         C::add_new_cart(id, cart_id, currency, pool).await
     }
 
-    #[tracing::instrument(skip(pool), fields(model = "Customer"))]
+    #[tracing::instrument(skip(pool))]
     pub async fn increment_refresh_token_counter<DB: CustomerRepository>(
         id: Uuid,
         pool: &PgPool,
@@ -138,7 +137,7 @@ impl Customer {
         DB::increment_refresh_token_counter(id, pool).await
     }
 
-    #[tracing::instrument(skip(pool), fields(model = "Customer"))]
+    #[tracing::instrument(skip(pool))]
     pub async fn fetch_refresh_token_counter<DB: CustomerRepository>(
         id: Uuid,
         pool: &PgPool,
@@ -149,7 +148,7 @@ impl Customer {
 
 /// Private API
 impl Customer {
-    #[tracing::instrument(skip(pool), fields(model = "Customer"))]
+    #[tracing::instrument(skip(pool))]
     async fn check_cart<DB: CustomerRepository>(id: Uuid, pool: &PgPool) -> Result<Uuid> {
         DB::check_cart(id, pool).await
     }

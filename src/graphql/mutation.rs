@@ -148,7 +148,6 @@ impl MutationRoot {
             .await
             .map_err(|e| e.extend())?;
         let token = context.access_token();
-        tracing::warn!(?token);
         let pool = context.pool;
 
         // Need to know whether to create a new cart, or update an existing one
