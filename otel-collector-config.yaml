@@ -15,6 +15,9 @@ exporters:
     endpoint: jaeger:14250
     insecure: true
 
+  elastic:
+    apm_server_url: "http://apm-server:8200"
+
 processors:
   batch:
   queued_retry:
@@ -32,8 +35,8 @@ service:
     traces:
       receivers: [otlp]
       processors: [batch, queued_retry]
-      exporters: [zipkin, jaeger]
+      exporters: [zipkin, jaeger, elastic]
     metrics:
       receivers: [otlp]
       processors: [batch]
-      exporters: [prometheus]
+      exporters: [prometheus, elastic]

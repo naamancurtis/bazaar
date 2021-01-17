@@ -65,7 +65,8 @@ pub async fn verify_and_deserialize_token<DB: AuthRepository>(
     Ok(BazaarToken::from(token_data))
 }
 
-#[tracing::instrument]
+/// The `user_id` here should always be their public ID, so it should never be logged
+#[tracing::instrument(skip(user_id))]
 pub fn encode_token(
     user_id: Option<Uuid>,
     cart_id: Uuid,
