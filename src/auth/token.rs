@@ -19,7 +19,10 @@ use crate::{
 ///
 /// This function will automatically invalidate any previous `Refresh Tokens`
 /// issued to that customer
-#[tracing::instrument(skip(public_id, pool))]
+#[tracing::instrument(
+    skip(public_id, pool, private_id)
+    fields(id = %private_id.map(|id| id.to_string()).unwrap_or_default())
+)]
 pub async fn generate_new_tokens<C: CustomerRepository>(
     public_id: Option<Uuid>,
     private_id: Option<Uuid>,

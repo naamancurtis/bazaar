@@ -32,3 +32,6 @@ _Breaking the User Story type requirements to explain what's going on here._
 Authentication in the application has been implemented with Access & Refresh **JSON Web Tokens**.
 Where **Access tokens** are short lived and irrevocable and **Refresh tokens** are longer lived and
 revocable.
+
+Both tokens are stored in `HttpOnly` cookies and subsequently are sent on every
+request.

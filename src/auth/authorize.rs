@@ -65,7 +65,8 @@ pub async fn verify_and_deserialize_token<DB: AuthRepository>(
     Ok(BazaarToken::from(token_data))
 }
 
-#[tracing::instrument]
+/// The `user_id` here should always be their public ID, so it should never be logged
+#[tracing::instrument(skip(user_id))]
 pub fn encode_token(
     user_id: Option<Uuid>,
     cart_id: Uuid,
@@ -98,7 +99,7 @@ pub fn encode_token(
     encode_jwt(&claims, token_type)
 }
 
-#[tracing::instrument]
+#[tracing::instrument(skip(claims))]
 pub(crate) fn encode_jwt(claims: &Claims, token_type: TokenType) -> Result<String, BazaarError> {
     let headers = Header::new(Algorithm::PS256);
     let key = if token_type == TokenType::Access {

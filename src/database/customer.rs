@@ -66,7 +66,7 @@ impl CustomerRepository for CustomerDatabase {
         Ok(customer)
     }
 
-    #[tracing::instrument(skip(pool), fields(repository = "customer"))]
+    #[tracing::instrument(skip(pool, email), fields(repository = "customer"))]
     async fn find_by_email(email: String, pool: &PgPool) -> Result<Customer> {
         let customer = query_as!(
             Customer,

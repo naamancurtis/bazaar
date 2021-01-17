@@ -50,12 +50,12 @@ pub(crate) struct SqlxShoppingCart {
 }
 
 impl ShoppingCart {
-    #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
+    #[tracing::instrument(skip(pool))]
     pub async fn find_by_id<DB: ShoppingCartRepository>(id: Uuid, pool: &PgPool) -> Result<Self> {
         DB::find_by_id(id, pool).await
     }
 
-    #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
+    #[tracing::instrument(skip(pool))]
     pub async fn find_by_customer_id<DB: ShoppingCartRepository>(
         customer_id: Uuid,
         pool: &PgPool,
@@ -63,7 +63,7 @@ impl ShoppingCart {
         DB::find_by_customer_id(customer_id, pool).await
     }
 
-    #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
+    #[tracing::instrument(skip(pool))]
     pub async fn find_cart_id_by_customer_id<DB: ShoppingCartRepository>(
         customer_id: Uuid,
         pool: &PgPool,
@@ -71,7 +71,7 @@ impl ShoppingCart {
         DB::find_cart_id_by_customer_id(customer_id, pool).await
     }
 
-    #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
+    #[tracing::instrument(skip(pool))]
     pub async fn new_anonymous<DB: ShoppingCartRepository>(
         currency: Currency,
         pool: &PgPool,
@@ -79,7 +79,7 @@ impl ShoppingCart {
         ShoppingCart::new::<DB>(Uuid::new_v4(), None, CartType::Anonymous, currency, pool).await
     }
 
-    #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
+    #[tracing::instrument(skip(pool))]
     pub async fn new_known<DB: ShoppingCartRepository>(
         id: Uuid,
         customer_id: Uuid,
@@ -89,7 +89,7 @@ impl ShoppingCart {
         ShoppingCart::new::<DB>(id, Some(customer_id), CartType::Known, currency, pool).await
     }
 
-    #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
+    #[tracing::instrument(skip(pool))]
     pub async fn edit_cart_items<DB: ShoppingCartRepository, CI: CartItemRepository>(
         cart_id: Uuid,
         items: Vec<InternalCartItem>,
@@ -100,7 +100,7 @@ impl ShoppingCart {
         cart.update_cart::<DB, CI>(pool).await
     }
 
-    #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
+    #[tracing::instrument(skip(pool))]
     pub async fn merge_shopping_carts<DB: ShoppingCartRepository, CI: CartItemRepository>(
         customers_cart_id: Uuid,
         anonymous_cart_id: Uuid,
@@ -113,7 +113,7 @@ impl ShoppingCart {
         Ok(customers_cart_id)
     }
 
-    #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
+    #[tracing::instrument(skip(pool))]
     pub async fn update_cart_type<DB: ShoppingCartRepository>(
         cart_id: Uuid,
         cart_type: CartType,
@@ -125,7 +125,7 @@ impl ShoppingCart {
 
 /// Private API
 impl ShoppingCart {
-    #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
+    #[tracing::instrument(skip(pool))]
     async fn new<DB: ShoppingCartRepository>(
         id: Uuid,
         customer_id: Option<Uuid>,
@@ -137,7 +137,7 @@ impl ShoppingCart {
     }
 
     // @TODO - Write unit tests for this
-    #[tracing::instrument(fields(model = "ShoppingCart"))]
+    #[tracing::instrument]
     fn update_items_in_cart(&mut self, items: Vec<InternalCartItem>) {
         let mut current_cart_items = Vec::new();
         std::mem::swap(&mut self.items, &mut current_cart_items);
@@ -155,7 +155,7 @@ impl ShoppingCart {
     }
 
     // @TODO - Write unit tests for this
-    #[tracing::instrument(fields(model = "ShoppingCart"))]
+    #[tracing::instrument]
     fn merge_items_from_other_cart(&mut self, other: Self) {
         let mut current_cart_items = Vec::new();
         std::mem::swap(&mut self.items, &mut current_cart_items);
@@ -177,7 +177,7 @@ impl ShoppingCart {
         self.items = item_set.into_iter().collect::<Vec<InternalCartItem>>();
     }
 
-    #[tracing::instrument(skip(pool), fields(model = "ShoppingCart"))]
+    #[tracing::instrument(skip(pool))]
     async fn update_cart<SC: ShoppingCartRepository, CI: CartItemRepository>(
         &mut self,
         pool: &PgPool,

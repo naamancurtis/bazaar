@@ -27,31 +27,38 @@ actix-rt = "1.1.1"
 actix-cors = "0.5.4"
 http = "0.2.3"
 
-async-graphql = "2.4.7" 
+async-graphql = { version = "2.4.11", features = ["apollo_tracing", "tracing", "chrono", "uuid"] }
 async-graphql-actix-web = "2.4.6"
+async-graphql-parser = "2.4.6"
 
 serde = { version = "1.0.117", features = ["derive"] }
 serde_json = "1.0.59"
 serde-aux = "1.1.0"
 chrono = { version = "0.4.19", features = ["serde"] }
 uuid = { version = "0.8.1", features = ["serde", "v4"] }
+lazy_static = "1.4.0"
+thiserror = "1.0.22"
+strum = { version = "0.20.0", features = ["derive"] } 
 
 sqlx = { version = "0.4.2", default-features = false, features = ["runtime-tokio-native-tls", "macros", "postgres", "uuid", "chrono", "migrate", "offline", "json"] }
 
 config = { version = "0.10.1", default-features = false, features = ["yaml"] }
 
-tracing = "0.1.22"
-tracing-subscriber = { version = "0.2.15", features = ["registry", "env-filter"] }
-tracing-futures = "0.2.4"
-tracing-log = "0.1.1"
-tracing-bunyan-formatter = "0.1.7"
-tracing-actix-web = "0.2.1"
+tracing = "0.1"
+tracing-subscriber = { version = "0.2", features = ["registry", "env-filter"] }
+tracing-futures = "0.2"
+tracing-log = "0.1"
+tracing-bunyan-formatter = "0.1"
 
-strum = { version = "0.20.0", features = ["derive"] } 
+opentelemetry = { version = "0.11", features = ["metrics", "tokio"] } 
+tracing-opentelemetry = "0.10"
+opentelemetry-otlp = { version = "0.4", features = ["tokio", "tonic", "default"] }
+opentelemetry-semantic-conventions = { version = "0.3" }
+actix-web-opentelemetry = "0.9.0"
+prometheus = "0.11.0"
+
 rust-argon2 = "0.8.3"
 jsonwebtoken = "7.2.0"
-lazy_static = "1.4.0"
-thiserror = "1.0.22"
 
 # Need to force 1.6.1 as there's a vulnerability < 1.6.1
 smallvec = "1.6.1"

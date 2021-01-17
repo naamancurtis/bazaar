@@ -24,7 +24,7 @@ pub struct UpdateCartItem {
 }
 
 impl CartItem {
-    #[tracing::instrument(skip(pool), fields(model = "CartItem"))]
+    #[tracing::instrument(skip(pool))]
     pub async fn find_multiple<DB: CartItemRepository>(
         internal_items: &[InternalCartItem],
         pool: &PgPool,
