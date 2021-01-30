@@ -1,6 +1,7 @@
 use actix_web::{web, HttpMessage, HttpRequest, HttpResponse, Result};
 use async_graphql::http::{playground_source, GraphQLPlaygroundConfig};
 use async_graphql_actix_web::{Request, Response};
+use async_graphql_telemetry_extension::OpenTelemetryConfig;
 use opentelemetry::Context;
 use tracing::Span;
 use tracing_opentelemetry::OpenTelemetrySpanExt;
@@ -8,14 +9,10 @@ use tracing_opentelemetry::OpenTelemetrySpanExt;
 use std::sync::Arc;
 
 use crate::{
-    graphql::{BazaarSchema, OpenTelemetryConfig},
+    graphql::BazaarSchema,
     models::{BazaarCookies, TokenType},
 };
 
-// Most of the Open Telemetry Context Stuff is pulled straight from `actix_web_opentelemetry`
-//
-// It doesn't quite seem correct to use it, given that this is a graphQL server, but a majority of
-// it is still needed to transfer the distributed tracing information across
 #[tracing::instrument(name = "graphql", skip(schema, http_request, graphql_request))]
 pub async fn graphql_index(
     schema: web::Data<BazaarSchema>,

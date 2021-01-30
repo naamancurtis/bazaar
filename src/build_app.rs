@@ -7,12 +7,13 @@ use actix_web::{
 };
 use actix_web_opentelemetry::RequestTracing;
 use async_graphql::{EmptySubscription, Schema};
+use async_graphql_telemetry_extension::OpenTelemetryExtension;
 use sqlx::PgPool;
 use std::net::TcpListener;
 
 use crate::{
-    auth::REFRESH_TOKEN_DURATION_SECONDS, graphql::OpenTelemetryExtension, routes::*, AppConfig,
-    BazaarSchema, MutationRoot, QueryRoot,
+    auth::REFRESH_TOKEN_DURATION_SECONDS, routes::*, AppConfig, BazaarSchema, MutationRoot,
+    QueryRoot,
 };
 
 pub fn generate_schema(connection: Option<PgPool>, config: Option<AppConfig>) -> BazaarSchema {
