@@ -59,6 +59,8 @@ prometheus = "0.11.0"
 async_graphql_telemetry_extension = { git = "https://github.com/naamancurtis/async_graphql_telemetry_extension", branch = "main" }
 
 rust-argon2 = "0.8.3"
+rand = "0.8.3"
+rand_chacha = "0.3.0"
 jsonwebtoken = "7.2.0"
 
 # Need to force 1.6.1 as there's a vulnerability < 1.6.1

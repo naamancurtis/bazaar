@@ -714,6 +714,8 @@ dependencies = [
  "opentelemetry-otlp",
  "opentelemetry-semantic-conventions",
  "prometheus",
+ "rand 0.8.3",
+ "rand_chacha 0.3.0",
  "regex",
  "reqwest",
  "rust-argon2",

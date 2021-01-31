@@ -2,7 +2,6 @@
 pub fn set_env_vars_for_tests() {
     use std::env::set_var;
     set_var("SECRET_KEY", "TEST KEY");
-    set_var("SALT", "TEST SALT");
     set_var(
         "ACCESS_TOKEN_PRIVATE_KEY",
         "-----BEGIN PRIVATE KEY-----

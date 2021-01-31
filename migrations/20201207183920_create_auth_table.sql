@@ -3,7 +3,7 @@ CREATE TABLE auth(
   PRIMARY KEY (email),
   public_id uuid NOT NULL UNIQUE,
   id uuid NOT NULL UNIQUE,
-  password_hash TEXT NOT NULL,
+  hashed_password TEXT NOT NULL,
   created_at timestamptz NOT NULL DEFAULT NOW(),
   last_modified timestamptz NOT NULL DEFAULT NOW()
 );

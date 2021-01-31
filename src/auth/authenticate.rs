@@ -1,29 +1,28 @@
 use argon2::{self, Config, ThreadMode, Variant, Version};
 use lazy_static::lazy_static;
+use rand::prelude::*;
+use rand_chacha::ChaCha20Rng;
 use sqlx::PgPool;
 use std::env::var;
 use tracing::error;
 
-use crate::{database::AuthRepository, models::auth::AuthCustomer, BazaarError};
+use crate::{database::AuthRepository, models::auth::AuthCustomer, BazaarError, Result};
 
-// @TODO - check these are actually okay being `lazy_static` - if the server
-// is left up and running for a long time, but we wanted to cycle keys every x
-// days, would this pick up on the changes? or would it store a constant value
-// for the whole period of time the server is up
+// Ideally, you would not want this as a static variable, as if the server
+// is left up and running for a long time, you would want to cycle keys every x
+// days and have that appropriately picked up on all running servers.
+//
+// In reality, to make the above viable, you'd have to integrate it with a key management system,
+// as you would need to know what the key was at the time when the user was created, so you could
+// correctly fetch the key to validate their password. So for now it will be left as a static
+// variable, but for an actual production system with real user data this wouldn't be appropriate
 lazy_static! {
     pub static ref SECRET_KEY: String = {
-        let secret_key: Result<String, ()> = var("SECRET_KEY").map_err(|e| {
+        let secret_key: std::result::Result<String, ()> = var("SECRET_KEY").map_err(|e| {
             error!(err = ?e, "failed to retrieve secret key");
             panic!("no SECRET KEY was provided");
         });
         secret_key.unwrap()
-    };
-    pub static ref SALT: String = {
-        let salt: Result<String, ()> = var("SALT").map_err(|e| {
-            error!(err = ?e, "failed to retrieve salt");
-            panic!("no SALT was provided");
-        });
-        salt.unwrap()
     };
 }
 
@@ -38,7 +37,7 @@ lazy_static! {
         thread_mode: ThreadMode::Parallel,
         secret: SECRET_KEY.as_bytes(),
         ad: &[],
-        hash_length: 32,
+        hash_length: 256,
     };
 }
 
@@ -62,20 +61,23 @@ pub async fn verify_password_and_fetch_details<DB: AuthRepository>(
     email: &str,
     password: &str,
     pool: &PgPool,
-) -> Result<AuthCustomer, BazaarError> {
+) -> Result<AuthCustomer> {
     let customer = DB::get_auth_customer(email, pool).await?;
-    if _verify_password(&password, &customer.password_hash)? {
+    if _verify_password(password, &customer.hashed_password)? {
         return Ok(customer);
     }
     Err(BazaarError::IncorrectCredentials)
 }
 
-pub fn hash_password(password: &str) -> Result<String, BazaarError> {
-    let hash = argon2::hash_encoded(password.as_bytes(), SALT.as_bytes(), &CONFIG)?;
+pub fn hash_password(password: &str) -> Result<String> {
+    let mut salt = [0u8; 128];
+    let mut salt_generator = ChaCha20Rng::from_entropy();
+    salt_generator.try_fill_bytes(&mut salt)?;
+    let hash = argon2::hash_encoded(password.as_bytes(), &salt, &CONFIG)?;
     Ok(hash)
 }
 
-fn _verify_password(password: &str, hashed_password: &str) -> Result<bool, BazaarError> {
+fn _verify_password(password: &str, hashed_password: &str) -> Result<bool> {
     let matches = argon2::verify_encoded_ext(
         &hashed_password,
         password.as_bytes(),
@@ -106,7 +108,7 @@ mod tests {
             Ok(AuthCustomer {
                 id: Uuid::new_v4(),
                 public_id: Uuid::new_v4(),
-                password_hash: email.to_string(),
+                hashed_password: email.to_string(),
             })
         }
     }
@@ -114,14 +116,13 @@ mod tests {
     fn set_up_env_vars() {
         use std::env::set_var;
         set_var("SECRET_KEY", "TEST KEY");
-        set_var("SALT", "TEST SALT");
     }
 
     #[test]
     fn hash_password_works() {
         set_up_env_vars();
-        let password = String::from("SUPERsecretPasSword1234");
-        let hashed_password = hash_password(&password).expect("hash failed");
+        let password = "SUPERsecretPasSword1234";
+        let hashed_password = hash_password(password).expect("hash failed");
         let matches = argon2::verify_encoded_ext(
             &hashed_password,
             password.as_bytes(),
@@ -132,11 +133,20 @@ mod tests {
         assert!(matches);
     }
 
+    #[test]
+    fn two_identical_passwords_should_have_different_hashes() {
+        set_up_env_vars();
+        let password = "SUPERsecretPasSword1234";
+        let hashed_password_1 = hash_password(password).expect("hash failed");
+        let hashed_password_2 = hash_password(password).expect("hash failed");
+        assert_ne!(hashed_password_1, hashed_password_2);
+    }
+
     #[tokio::test]
     async fn verify_password_works() {
         set_up_env_vars();
-        let password = String::from("SUPERsecretPasSword1234");
-        let hashed_password = hash_password(&password).expect("hash failed");
+        let password = "SUPERsecretPasSword1234";
+        let hashed_password = hash_password(password).expect("hash failed");
         let config = crate::get_configuration().expect("failed to read config");
         let pool = PgPool::connect_lazy(&config.database.raw_pg_url())
             .expect("failed to create fake connection");
@@ -149,8 +159,8 @@ mod tests {
     #[test]
     fn _verify_password_works() {
         set_up_env_vars();
-        let password = String::from("SUPERsecretPasSword1234");
-        let hashed_password = hash_password(&password).expect("hash failed");
-        assert!(_verify_password(&password, &hashed_password).unwrap());
+        let password = "SUPERsecretPasSword1234";
+        let hashed_password = hash_password(password).expect("hash failed");
+        assert!(_verify_password(password, &hashed_password).unwrap());
     }
 }

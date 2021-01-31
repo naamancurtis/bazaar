@@ -42,8 +42,14 @@ pub enum BazaarError {
     #[error("Provided data was malformed")]
     MalformedData,
 
-    #[error("Unexpected error occurred")]
+    #[error(transparent)]
     CryptoError(#[from] argon2::Error),
+
+    #[error("Rand Error: {0}")]
+    RandError(String),
+
+    #[error(transparent)]
+    StrConversion(#[from] std::str::Utf8Error),
 }
 
 impl ErrorExtensions for BazaarError {
@@ -151,5 +157,16 @@ impl From<tokio::task::JoinError> for BazaarError {
             "Tokio task join error occurred"
         );
         BazaarError::UnexpectedError
+    }
+}
+
+impl From<rand::Error> for BazaarError {
+    fn from(e: rand::Error) -> BazaarError {
+        error!(
+            err = ?e,
+            error_code = ?e.code(),
+            "Received Rand error"
+        );
+        BazaarError::RandError(e.to_string())
     }
 }

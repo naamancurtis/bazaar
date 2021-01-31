@@ -1,5 +1,37 @@
 {
   "db": "PostgreSQL",
+  "0b097ce695bc23fa487aa51753db89aca1e9e9c0730ef1545b03949edc965d53": {
+    "query": "\n            SELECT public_id, id, hashed_password FROM auth WHERE email = $1\n            ",
+    "describe": {
+      "columns": [
+        {
+          "ordinal": 0,
+          "name": "public_id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 1,
+          "name": "id",
+          "type_info": "Uuid"
+        },
+        {
+          "ordinal": 2,
+          "name": "hashed_password",
+          "type_info": "Text"
+        }
+      ],
+      "parameters": {
+        "Left": [
+          "Text"
+        ]
+      },
+      "nullable": [
+        false,
+        false,
+        false
+      ]
+    }
+  },
   "1d340d11f64c533e206f926214948fc3cfec0692f691d5881e81be95bb2a309d": {
     "query": "\n            SELECT\n                id, customer_id,\n                cart_type as \"cart_type!: CartType\", \n                items as \"items!: Json<Vec<InternalCartItem>>\",\n                currency as \"currency!: Currency\",\n                discounts, price_before_discounts, price_after_discounts,\n                created_at, last_modified\n            FROM shopping_carts WHERE id = $1\n            ",
     "describe": {
@@ -88,38 +120,6 @@
         false,
         true,
         false,
-        false,
-        false,
-        false
-      ]
-    }
-  },
-  "224b62a4a889ad814b8473dcc4a034676d582842756ba53e75694a00160bae9b": {
-    "query": "\n            SELECT public_id, id, password_hash FROM auth WHERE email = $1\n            ",
-    "describe": {
-      "columns": [
-        {
-          "ordinal": 0,
-          "name": "public_id",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 1,
-          "name": "id",
-          "type_info": "Uuid"
-        },
-        {
-          "ordinal": 2,
-          "name": "password_hash",
-          "type_info": "Text"
-        }
-      ],
-      "parameters": {
-        "Left": [
-          "Text"
-        ]
-      },
-      "nullable": [
         false,
         false,
         false
@@ -739,6 +739,21 @@
       ]
     }
   },
+  "ce39b74c000ba0b4caad0f7c069cf98a6f1bb5893974cebc9db184a32640f78e": {
+    "query": "\n            INSERT INTO auth (public_id, id, hashed_password, email)\n            VALUES ($1, $2, $3, $4)\n        ",
+    "describe": {
+      "columns": [],
+      "parameters": {
+        "Left": [
+          "Uuid",
+          "Uuid",
+          "Text",
+          "Text"
+        ]
+      },
+      "nullable": []
+    }
+  },
   "d10c6c4782d2ae6cf5c1ce97dc298019973c9b63ad65a51e65cd66f08a1b64a8": {
     "query": "\n            INSERT INTO customers ( id, email, first_name, last_name, cart_id )\n            VALUES ( $1, $2, $3, $4, $5)\n            ",
     "describe": {
@@ -826,21 +841,6 @@
         false,
         false
       ]
-    }
-  },
-  "e4a21b64d2aff2ba8227743ec48813b71cc3d45b1793f982880ae120cb090b59": {
-    "query": "\n            INSERT INTO auth (public_id, id, password_hash, email)\n            VALUES ($1, $2, $3, $4)\n        ",
-    "describe": {
-      "columns": [],
-      "parameters": {
-        "Left": [
-          "Uuid",
-          "Uuid",
-          "Text",
-          "Text"
-        ]
-      },
-      "nullable": []
     }
   },
   "f2b124167500ea26e9971839c85e54f1d4862686cdad59c614bf73f9e415c20c": {

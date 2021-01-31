@@ -43,7 +43,7 @@ pub struct NewCustomer {
     pub private_id: Uuid,
     pub cart_id: Uuid,
     pub email: String,
-    pub password_hash: String,
+    pub hashed_password: String,
     pub first_name: String,
     pub last_name: String,
 }
@@ -81,7 +81,7 @@ impl Customer {
         pool: &PgPool,
     ) -> Result<CustomerIds> {
         let public_id = Uuid::new_v4();
-        let password_hash = auth::hash_password(&password)?;
+        let hashed_password = auth::hash_password(&password)?;
         let shopping_cart_id = if let Some(id) = cart_id {
             id
         } else {
@@ -93,7 +93,7 @@ impl Customer {
             private_id: id,
             cart_id: shopping_cart_id,
             email,
-            password_hash,
+            hashed_password,
             first_name,
             last_name,
         };

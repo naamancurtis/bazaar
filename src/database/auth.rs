@@ -35,7 +35,7 @@ impl AuthRepository for AuthDatabase {
         let customer = query_as!(
             AuthCustomer,
             r#"
-            SELECT public_id, id, password_hash FROM auth WHERE email = $1
+            SELECT public_id, id, hashed_password FROM auth WHERE email = $1
             "#,
             email
         )

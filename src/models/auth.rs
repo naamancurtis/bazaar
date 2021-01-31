@@ -4,12 +4,12 @@ use uuid::Uuid;
 
 use crate::{database::AuthRepository, Result};
 
-#[derive(Debug, Deserialize)]
+#[derive(Deserialize)]
 #[serde(rename_all(serialize = "snake_case", deserialize = "camelCase"))]
 pub struct AuthCustomer {
     pub public_id: Uuid,
     pub(crate) id: Uuid,
-    pub password_hash: String,
+    pub hashed_password: String,
 }
 
 impl AuthCustomer {
