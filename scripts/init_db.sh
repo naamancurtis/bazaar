@@ -10,6 +10,7 @@ DB_PASSWORD="${POSTGRES_PASSWORD:=password}"
 DB_NAME="${POSTGRES_DB:=bazaar}"
 # Check if a custom port has been set, otherwise default to '5432'
 DB_PORT="${POSTGRES_PORT:=5432}"
+DB_HOST="${POSTGRES_HOST:=localhost}"
 
 # Allow to skip Docker if a dockerized Postgres database is already running
 if [[ -z "${SKIP_DOCKER}" ]]
@@ -27,19 +28,19 @@ fi
 
 
 # Keep pinging Postgres until it's ready to accept commands
-until PGPASSWORD="${DB_PASSWORD}" psql -h "localhost" -U "${DB_USER}" -p "${DB_PORT}" -d "postgres" -c '\q'; do
+until PGPASSWORD="${DB_PASSWORD}" psql -h "${DB_HOST}" -U "${DB_USER}" -p "${DB_PORT}" -d "postgres" -c '\q'; do
   >&2 echo "Postgres is still unavailable - sleeping"
   sleep 1
 done
 
 >&2 echo "Postgres is up and running on port ${DB_PORT}!"
 
-export DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@localhost:${DB_PORT}/${DB_NAME}
+export DATABASE_URL=postgres://${DB_USER}:${DB_PASSWORD}@${DB_HOST}:${DB_PORT}/${DB_NAME}
 sqlx database create
 sqlx migrate run
 
 >&2 echo "Postgres has been migrated, ready to go!"
 
-PGPASSWORD="${DB_PASSWORD}" psql -U "${DB_USER}" -d "${DB_NAME}" -h "localhost"  -p "${DB_PORT}" -f ./scripts/seed_items.sql
+PGPASSWORD="${DB_PASSWORD}" psql -U "${DB_USER}" -d "${DB_NAME}" -h "${DB_HOST}"  -p "${DB_PORT}" -f ./scripts/seed_items.sql
 
 >&2 echo "Successfully seeded database items"

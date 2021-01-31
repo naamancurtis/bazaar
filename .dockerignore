@@ -2,5 +2,4 @@
 target/
 tests/
 Dockerfile
-scripts/
 migration/

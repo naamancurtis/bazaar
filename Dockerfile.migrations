@@ -1,0 +1,13 @@
+FROM rust
+
+WORKDIR /app
+
+COPY . .
+
+RUN apt-get update
+RUN apt-get -y install postgresql-client
+RUN cargo install --version=0.2.0 sqlx-cli --no-default-features --features postgres
+
+ENV SKIP_DOCKER=true
+
+ENTRYPOINT ["./scripts/init_db.sh"]

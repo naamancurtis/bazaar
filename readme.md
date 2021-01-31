@@ -36,13 +36,33 @@ in this project, so I've left the connections in.
 
 ## Running the App
 
-The app requires a running instance of Postgres, the easiest way to set this up
+The app outputs structured **json** logs, if you want a more human friendly view of them
+you can download the [node-bunyan cli](https://github.com/trentm/node-bunyan)
+and pipe them through that.
+
+### Running the whole app within docker-compose
+
+There is a demo `docker-compose` file within the repository that should handle
+setting up all dependencies and the application within the docker
+environment. It can be run with:
+
+```sh
+docker-compose -f docker-compose.demo.yaml up
+```
+
+### Running dependencies in docker-compose and running the app via Rust
+
+If you want to run all of the dependencies in docker, but the app with `rust`, you can use the
+`docker-compose.yaml` file. Once the docker-compose has spun up, migrate the database by running `SKIP_DOCKER=true ./scripts/init_db.sh`.
+Once the migration has finished the application can then be run with `cargo run --bin app`.
+
+### Minimal dependencies directly via docker
+
+The minimum dependencies the app requires is a running instance of `Postgres`, the easiest way to set this up
 is to run the `./scripts/init_db.sh` script, which will pull down the latest
 docker postgres image, start it up, and run the migrations.
 
-If you want the full stack, including the telemetry collector and telemetry backends, it's
-best to use the `docker-compose` file (which includes postgres, so skip the step
-above), start up the docker-compose file, migrate the database manually with `SKIP_DOCKER=true ./scripts/init_db.sh` and then run the application (either in Docker or locally).
+You can then run the actual application with `cargo run --bin app`.
 
 ### Docker
 
